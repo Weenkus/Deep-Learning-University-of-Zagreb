@@ -1,6 +1,8 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import random
+import time
 
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import recall_score
@@ -8,13 +10,13 @@ from sklearn.metrics import precision_score
 
 
 def main():
-    np.random.seed(100)
+    #np.random.seed(100)
 
     # get the training dataset
     X,Y_ = sample_gauss_2d(2, 100)
 
     # get the class predictions
-    Y = myDummyDecision(X)>0.5
+    Y = myDummyDecision(X) > 0.5
 
     # graph the data points
     graph_data(X, Y_, Y)
@@ -23,9 +25,15 @@ def main():
     #plt.savefig('sample_gauss_2d.png')
     plt.show()
 
+    # mean = [2, 1]
+    # cov = [[1, 0], [0, 100]]
+    # x, y = np.random.multivariate_normal(mean, cov, 100).T
+    # plt.plot(x, y, 'x')
+    # plt.axis('equal')
+    # plt.show()
+
 
 class Random2DGaussian(object):
-    #np.random.seed(100)
 
     def __init__(self):
         self.min_x = 0
@@ -33,27 +41,28 @@ class Random2DGaussian(object):
         self.min_y = 0
         self.max_y = 10
 
-        centar_x = np.random.uniform(self.min_x, self.max_x)
-        centar_y = np.random.uniform(self.min_y, self.max_y)
+        centar_x = (self.max_x - self.min_x) * np.random.random_sample() + self.min_x
+        centar_y = (self.max_y - self.min_y) * np.random.random_sample() + self.min_y
         self.mean = np.array([centar_x, centar_y])
-        print("Mean:", self.mean)
 
-        eigval_x = (np.random.random_sample()*(self.max_x - self.min_x)/5)**2
-        eigval_y = (np.random.random_sample()*(self.max_y - self.min_y)/5)**2
-
+        eigval_x = (np.random.random_sample() * (self.max_x - self.min_x)/5)**2
+        eigval_y = (np.random.random_sample() * (self.max_y - self.min_y)/5)**2
         D = np.array([[eigval_x, 0], [0, eigval_y]])
-        R = np.array([[45, 0], [0, 45]])
 
-        self.covariance_matrix = R.T * D * R
+        theta = random.randint(-180, 180)
+        R = np.array([[math.cos(theta), -math.sin(theta)], [math.sin(theta), math.cos(theta)]])
+
+        self.cov = np.dot(np.dot(R.T, D), R)
 
     def get_sample(self, n, show=False):
         assert(n > 0)
 
         if show:
-            print('Mean:\n', self.mean)
-            print('\nCovariance matrix:\n', self.covariance_matrix)
+            print('Mean:', self.mean)
+            print('Covariance matrix:\n', self.cov)
+            print()
 
-        x, y = np.random.multivariate_normal(self.mean, self.covariance_matrix, size=n).T
+        x, y = np.random.multivariate_normal(self.mean, self.cov, n).T
         return np.column_stack((x, y))
 
 
@@ -62,10 +71,8 @@ def sample_gauss_2d(C, N):
 
     X_parts = []
     for i in range(0, C):
-        G = Random2DGaussian()
-        Y_ = np.random.choice([0, 1], size=(N,), p=[1./2, 1./2])
-
-        X_parts.append(G.get_sample(N))
+        normally_distributed_data = Random2DGaussian().get_sample(class_size, show=True)
+        X_parts.append(normally_distributed_data)
 
     X = np.vstack((X_parts[0], X_parts[1]))
 
@@ -88,8 +95,9 @@ def eval_AP(Y_sorted):
 def graph_data(X, Y_, Y):
     predictions = ['o' if y == y_ else 's' for y, y_ in zip(Y_, Y)]
     for i, prediction in enumerate(predictions):
+
         color = 'grey' if Y_[i] == 0 else 'white'
-        plt.scatter(X[:, 0][i], X[:, 1][i], marker=prediction, s=60, c=color)
+        plt.scatter(X[i][0], X[i][1], marker=prediction, s=40, c=color)
 
 
 def myDummyDecision(X):
