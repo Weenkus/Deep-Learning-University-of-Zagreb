@@ -3,6 +3,7 @@ import math
 import matplotlib.pyplot as plt
 import random
 import time
+import binlogreg
 
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import recall_score
@@ -10,27 +11,29 @@ from sklearn.metrics import precision_score
 
 
 def main():
-    #np.random.seed(100)
+    np.random.seed(100)
 
-    # get the training dataset
-    X,Y_ = sample_gauss_2d(2, 100)
+    # create the dataset
+    X, Y_ = sample_gauss_2d(2, 100)
+    w, b = binlogreg.binlogreg_train(X, Y_)
 
-    # get the class predictions
-    Y = myDummyDecision(X) > 0.5
+    # fit the model
+    probabilities = binlogreg.binlogreg_classify(X, w, b)
+    Y = np.where(probabilities >= .5, 1, 0)
+
+    # evaluate the model
+    accuracy, recall, precision = eval_perf_binary(Y, Y_)
+    AP = eval_AP(Y_[probabilities.argsort()])
+    print('Acc: {0}\nRecall: {1}\nPrecision: {2}\nAP: {3}\n'.format(accuracy, recall, precision, AP))
 
     # graph the data points
+    bbox = (np.min(X, axis=0), np.max(X, axis=0))
+    graph_surface(binlogreg_decfun(X, w, b), bbox, offset=0)
     graph_data(X, Y_, Y)
 
     # show the results
     #plt.savefig('sample_gauss_2d.png')
-    plt.show()
-
-    # mean = [2, 1]
-    # cov = [[1, 0], [0, 100]]
-    # x, y = np.random.multivariate_normal(mean, cov, 100).T
-    # plt.plot(x, y, 'x')
-    # plt.axis('equal')
-    # plt.show()
+    #plt.show()
 
 
 class Random2DGaussian(object):
@@ -81,7 +84,7 @@ def sample_gauss_2d(C, N):
         i_class = np.full((class_size, 1), i)
         Y_ = np.vstack((Y_, i_class))
 
-    return X, Y_.T[0]
+    return X, Y_.ravel()
 
 
 def eval_perf_binary(Y, Y_):
@@ -103,6 +106,26 @@ def graph_data(X, Y_, Y):
 def myDummyDecision(X):
     scores = X[:, 0] + X[:, 1] - 5
     return scores > 0.5
+
+
+def binlogreg_decfun(X, w, b):
+    def classify(X):
+        return binlogreg.binlogreg_classify(X, w, b)
+    return classify
+
+
+def graph_surface(fun, rect, offset=0.5, width=1000, height=800, resolution=400):
+    x_min, x_max = rect[0][0], rect[1][0]
+    y_min, y_max = rect[0][1], rect[1][1]
+
+    xx, yy = np.meshgrid(np.linspace(x_min, x_max, resolution), np.linspace(y_min, y_max, resolution))
+    coordinate_net = np.vstack((xx.ravel(), yy.ravel())).T
+
+    Z = fun(coordinate_net).reshape(xx.shape)
+    z_min, z_max = -np.abs(Z).max(), np.abs(Z).max()
+    plt.figure(figsize=(60, 40))
+    plt.pcolormesh(xx, yy, Z, vmin=z_min, vmax=z_max)
+    plt.colorbar()
 
 if __name__ == '__main__':
     main()
