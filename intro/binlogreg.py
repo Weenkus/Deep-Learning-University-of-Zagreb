@@ -16,7 +16,7 @@ def main():
     print('Acc: {0}\nRecall: {1}\nPrecision: {2}\nAP: {3}\n'.format(accuracy, recall, precision, AP))
 
 
-def binlogreg_train(X, Y_, param_niter=1000, param_delta=0.00009):
+def binlogreg_train(X, Y_, param_niter=1000, param_delta=0.2):
     b = 0
     w = np.random.randn(2)
     N = len(Y_)

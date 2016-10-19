@@ -81,7 +81,7 @@ def sample_gauss_2d(C, N):
         i_class = np.full((class_size, 1), i)
         Y_ = np.vstack((Y_, i_class))
 
-    return X, Y_
+    return X, Y_.T[0]
 
 
 def eval_perf_binary(Y, Y_):
