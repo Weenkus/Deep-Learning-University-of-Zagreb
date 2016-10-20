@@ -33,7 +33,7 @@ def main():
 
     # show the results
     #plt.savefig('sample_gauss_2d.png')
-    #plt.show()
+    plt.show()
 
 
 class Random2DGaussian(object):

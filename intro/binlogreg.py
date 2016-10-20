@@ -33,16 +33,16 @@ def binlogreg_train(X, Y_, param_niter=500, param_delta=0.2):
             print("iteration {}: loss {}".format(i, loss))
 
             # Graph
-            Y = np.where(probabilities >= .5, 1, 0)
-            bbox = (np.min(X, axis=0), np.max(X, axis=0))
-            data.graph_surface(data.binlogreg_decfun(X, w, b), bbox, offset=0)
-            data.graph_data(X, Y_, Y)
-
-            # Animate
-            fname = '_tmp%03d.png' % i
-            print('Saving frame', fname)
-            plt.savefig(fname)
-            files.append(fname)
+            # Y = np.where(probabilities >= .5, 1, 0)
+            # bbox = (np.min(X, axis=0), np.max(X, axis=0))
+            # data.graph_surface(data.binlogreg_decfun(X, w, b), bbox, offset=0)
+            # data.graph_data(X, Y_, Y)
+            #
+            # # Animate
+            # fname = '_tmp%03d.png' % i
+            # print('Saving frame', fname)
+            # plt.savefig(fname)
+            # files.append(fname)
 
         dL_dscores = probabilities - Y_  # derivacije gubitka po klasifikacijskom rezultatu N x 1
 
@@ -56,8 +56,8 @@ def binlogreg_train(X, Y_, param_niter=500, param_delta=0.2):
 
         #plt.show()
 
-    print('Making movie animation.mpg - this make take a while')
-    os.system("mencoder 'mf://_tmp*.png' -mf type=png:fps=10 -ovc lavc -lavcopts vcodec=wmv2 -oac copy -o animation.mpg")
+    # print('Making movie animation.mpg - this make take a while')
+    # os.system("mencoder 'mf://_tmp*.png' -mf type=png:fps=10 -ovc lavc -lavcopts vcodec=wmv2 -oac copy -o animation.mpg")
     #os.system("convert _tmp*.png animation.mng")
 
     # cleanup
