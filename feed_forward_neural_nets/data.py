@@ -128,7 +128,6 @@ def graph_surface(fun, rect, offset=0.5, width=1000, height=800, resolution=400)
     coordinate_net = np.vstack((xx.ravel(), yy.ravel())).T
 
     Z = fun(coordinate_net).reshape(xx.shape)
-    z_min, z_max = -np.abs(Z).max(), np.abs(Z).max()
     plt.figure(figsize=(60, 40))
     plt.pcolormesh(xx, yy, Z, vmin=0, vmax=1)
     plt.colorbar()
