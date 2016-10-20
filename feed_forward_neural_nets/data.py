@@ -2,7 +2,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import random
-import binlogreg
 
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import recall_score
@@ -10,24 +9,22 @@ from sklearn.metrics import precision_score
 
 
 def main():
-    np.random.seed(100)
+    np.random.seed(101)
 
     # create the dataset
-    X, Y_ = sample_gauss_2d(2, 100)
-    w, b = binlogreg.binlogreg_train(X, Y_)
+    X, Y_ = sample_gmm_2d(K=4, C=2, N=30)
 
     # fit the model
-    probabilities = binlogreg.binlogreg_classify(X, w, b)
-    Y = np.where(probabilities >= .5, 1, 0)
+    Y = myDummyDecision(X)
 
     # evaluate the model
     accuracy, recall, precision = eval_perf_binary(Y, Y_)
-    AP = eval_AP(Y_[probabilities.argsort()])
+    AP = eval_AP(Y_[Y.argsort()])
     print('Acc: {0}\nRecall: {1}\nPrecision: {2}\nAP: {3}\n'.format(accuracy, recall, precision, AP))
 
     # graph the data points
     bbox = (np.min(X, axis=0), np.max(X, axis=0))
-    graph_surface(binlogreg_decfun(X, w, b), bbox, offset=0)
+    graph_surface(myDummyDecision, bbox, offset=0)
     graph_data(X, Y_, Y)
 
     # show the results
@@ -86,6 +83,22 @@ def sample_gauss_2d(C, N):
     return X, Y_.ravel()
 
 
+def sample_gmm_2d(K, C, N):
+    input_parts = []
+    output_parts = []
+    for i in range(0, K):
+        normally_distributed_data = Random2DGaussian().get_sample(N, show=False)
+        input_parts.append(normally_distributed_data)
+
+        class_index = np.random.randint(low=0, high=C)
+        output_parts.append(np.array([class_index] * N))
+
+    X = np.vstack(input_parts)
+    Y_ = np.hstack(output_parts)
+
+    return X, Y_
+
+
 def eval_perf_binary(Y, Y_):
     return accuracy_score(Y_, Y), recall_score(Y_, Y), precision_score(Y_, Y)
 
@@ -105,12 +118,6 @@ def graph_data(X, Y_, Y):
 def myDummyDecision(X):
     scores = X[:, 0] + X[:, 1] - 5
     return scores > 0.5
-
-
-def binlogreg_decfun(X, w, b):
-    def classify(X):
-        return binlogreg.binlogreg_classify(X, w, b)
-    return classify
 
 
 def graph_surface(fun, rect, offset=0.5, width=1000, height=800, resolution=400):
