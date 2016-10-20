@@ -27,7 +27,7 @@ def main():
     plt.show()
 
 
-def fcann2_train(X, Y_, param_niter=10000, param_delta=0.00005, param_lambda=1e-3, hidden_layer_dim=15):
+def fcann2_train(X, Y_, param_niter=10000, param_delta=0.005, param_lambda=0, hidden_layer_dim=5):
     np.random.seed(100)
 
     output_dim = 2
@@ -87,9 +87,10 @@ def fcann2_train(X, Y_, param_niter=10000, param_delta=0.00005, param_lambda=1e-
         }
 
         if i % 10 == 0:
-            corect_logprobs = -np.log(probabilities[range(N), Y_])
-            data_loss = np.sum(corect_logprobs)
-            loss = 1./N * data_loss
+            # corect_logprobs = -np.log(probabilities[range(N), Y_])
+            # data_loss = np.sum(corect_logprobs)
+            # loss = 1./N * data_loss
+            loss = np.sum(-np.log(probabilities))  # scalar
             print("iteration {}: loss {}".format(i, loss))
 
     print('\n\n                   *****  Neural Net   *****\n')
