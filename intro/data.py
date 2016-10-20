@@ -2,7 +2,6 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import random
-import time
 import binlogreg
 
 from sklearn.metrics import accuracy_score
@@ -32,7 +31,7 @@ def main():
     graph_data(X, Y_, Y)
 
     # show the results
-    #plt.savefig('sample_gauss_2d.png')
+    #plt.savefig('Binary_logistic_regression_classification.png')
     plt.show()
 
 
