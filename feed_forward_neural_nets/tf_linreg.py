@@ -39,7 +39,7 @@ def main():
     sess.run(tf.initialize_all_variables())
 
     # Inputs
-    feed_dict={X: [1, 2], Y_: [3, 5]}
+    feed_dict = {X: [1, 2], Y_: [3, 5]}
 
     # Train the model
     for i in range(100):

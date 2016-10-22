@@ -83,7 +83,7 @@ def sample_gauss_2d(C, N):
     return X, Y_.ravel()
 
 
-def sample_gmm_2d(K, C, N):
+def sample_gmm_2d(K, C, N, one_hot=False):
     input_parts = []
     output_parts = []
     for i in range(0, K):
@@ -91,10 +91,16 @@ def sample_gmm_2d(K, C, N):
         input_parts.append(normally_distributed_data)
 
         class_index = np.random.randint(low=0, high=C)
-        output_parts.append(np.array([class_index] * N))
+
+        if not one_hot:
+            output_parts.append(np.array([class_index] * N))
+        else:
+            class_one_hot = [0] * C
+            class_one_hot[class_index] = 1
+            output_parts.append(np.array([class_one_hot] * N))
 
     X = np.vstack(input_parts)
-    Y_ = np.hstack(output_parts)
+    Y_ = np.vstack(output_parts) if one_hot else np.hstack(output_parts)
 
     return X, Y_
 
