@@ -27,7 +27,7 @@ def main():
     plt.show()
 
 
-def fcann2_train(X, Y_, param_niter=10000, param_delta=0.005, param_lambda=0, hidden_layer_dim=5):
+def fcann2_train(X, Y_, param_niter=10000, param_delta=0.0005, param_lambda=0, hidden_layer_dim=5):
     np.random.seed(100)
 
     output_dim = 2
@@ -87,10 +87,8 @@ def fcann2_train(X, Y_, param_niter=10000, param_delta=0.005, param_lambda=0, hi
         }
 
         if i % 10 == 0:
-            # corect_logprobs = -np.log(probabilities[range(N), Y_])
-            # data_loss = np.sum(corect_logprobs)
-            # loss = 1./N * data_loss
-            loss = np.sum(-np.log(probabilities))  # scalar
+            log_prob = -np.log(probabilities[range(N), Y_])
+            loss = 1./N * np.sum(log_prob)
             print("iteration {}: loss {}".format(i, loss))
 
     print('\n\n                   *****  Neural Net   *****\n')
@@ -113,12 +111,27 @@ def fcann2_classify(X, model):
     return probabilities
 
 
+def predict(model, x):
+    W1, b1, W2, b2 = model['W1'], model['b1'], model['W2'], model['b2']
+    # Forward propagation
+    scores1 = x.dot(W1) + b1
+    h1 = np.maximum(0, scores1)
+    scores2 = h1.dot(W2) + b2
+    exp_scores = np.exp(scores2)
+    probs = exp_scores / np.sum(exp_scores, axis=1, keepdims=True)
+    return np.argmax(probs, axis=1)
+
+
 def fcann2_decfun(X, model):
     def classify(X):
         probabilities = fcann2_classify(X, model)
-        Y = np.argmax(probabilities, axis=1)
-        return probabilities[0][Y]
+        return np.argmax(probabilities, axis=1)
     return classify
+
+# def fcann2_decfun(X, model):
+#     def classify(X):
+#         return predict(model, X)
+#     return classify
 
 
 if __name__ == '__main__':
