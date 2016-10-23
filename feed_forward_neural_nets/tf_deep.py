@@ -9,12 +9,21 @@ def main():
     tf.set_random_seed(100)
 
     # Init the dataset
-    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=20)
+    class_num = 2
+    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=class_num, N=10)
 
     # Construct the computing graph
-    tf_deep = TFDeep(X.shape[1], Yoh_.shape[1], 0.5)
+    tf_deep = TFDeep(
+        nn_configuration=[2, 10, 10, class_num],
+        param_delta=0.1,
+        param_lambda=1e-4,
+        no_linearity_function=tf.nn.relu
+    )
 
-    tf_deep.train(X, Yoh_, 1000)
+    tf_deep.count_params()
+    exit(0)
+
+    tf_deep.train(X, Yoh_, param_niter=10000)
     tf_deep.eval(X, Yoh_)
 
     # Plot the results
@@ -35,26 +44,57 @@ def tflogreg_classify(X, model):
 
 class TFDeep(object):
 
-    def __init__(self, D, C, param_delta=1000, param_lambda=0.02):
-        self.dimension_num = D
-        self.class_num = C
+    def __init__(self, nn_configuration, param_delta, param_lambda, no_linearity_function):
+        self.nn_configuration = nn_configuration
+        self.dimension_num = nn_configuration[0]
+        self.class_num = nn_configuration[-1]
+        self.no_linearity_function = no_linearity_function
 
         self.X = tf.placeholder(tf.float32, [None, self.dimension_num])
         self.Yoh_ = tf.placeholder(tf.float32, [None, self.class_num])
 
-        self.W = tf.Variable(tf.zeros([self.dimension_num, self.class_num]))
-        self.b = tf.Variable(tf.zeros([self.class_num]))
+        self.__construct_layers(nn_configuration)
+        self.__construct_output()
 
-        self.probs = tf.nn.softmax(tf.matmul(self.X, self.W) + self.b)
-
-        empirical_loss = tf.reduce_mean(-tf.reduce_sum(self.Yoh_ * tf.log(self.probs), reduction_indices=1))
-        regularization = param_lambda * tf.nn.l2_loss(self.W)
-        self.loss = empirical_loss + regularization
-
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.pred, self.Yoh_))
         self.optimizer = tf.train.GradientDescentOptimizer(param_delta).minimize(self.loss)
 
         self.sess = tf.Session()
-        #self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+
+    def __construct_layers(self, nn_configuration):
+        self.W = []
+        self.b = []
+        print('Layer structure:')
+
+        for i, layer_dimension in enumerate(nn_configuration[:-1]):
+            layer_input = layer_dimension
+            layer_output = nn_configuration[i+1]
+
+            print('Layer W{0}: [{1}, {2}]  B{0}: [{2}]'.format(i, layer_input, layer_output))
+            self.W.append(tf.Variable(tf.random_normal([layer_input, layer_output]), name='W{0}'.format(i)))
+            self.b.append(tf.Variable(tf.random_normal([layer_output]), name='b{0}'.format(i)))
+
+        print()
+
+    def __construct_output(self):
+        current_layer_input = self.X
+        for layer_index, weight in enumerate(self.W):
+            layer = tf.add(tf.matmul(current_layer_input, weight), self.b[layer_index])
+
+            layer = self.no_linearity_function(layer) if layer_index != len(self.W) - 1 else tf.nn.softmax(layer)
+            current_layer_input = layer
+
+        self.pred = current_layer_input
+
+    def count_params(self):
+        print('Params:')
+        for var in tf.trainable_variables():
+            print(var.name, tf.shape(var))
+
+        param_per_layer = self.nn_configuration[0] + 1
+        total_param = sum([param_per_layer * layer for layer in self.nn_configuration[1:]])
+        print('Total parameter components:', total_param)
+        print()
 
     def train(self, X, Yoh_, param_niter):
         init = tf.initialize_all_variables()
@@ -62,21 +102,21 @@ class TFDeep(object):
 
         for iteration in range(param_niter):
 
-            _, loss, probs = self.sess.run(
-                [self.optimizer, self.loss, self.probs],
+            _, loss, pred = self.sess.run(
+                [self.optimizer, self.loss, self.pred],
                 feed_dict={self.X: X, self.Yoh_: Yoh_}
             )
 
             print(iteration, loss)
 
     def eval(self, X, Yoh_):
-        correct_prediction = tf.equal(tf.argmax(self.probs, 1), tf.argmax(self.Yoh_, 1))
+        correct_prediction = tf.equal(tf.argmax(self.pred, 1), tf.argmax(self.Yoh_, 1))
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         print("Accuracy:", accuracy.eval({self.X: X, self.Yoh_: Yoh_}, session=self.sess))
-        return self.probs
+        return self.pred
 
     def predict(self, X):
-        probs = self.sess.run(self.probs, feed_dict={self.X: X})
+        probs = self.sess.run(self.pred, feed_dict={self.X: X})
         return np.argmax(probs, axis=1)
 
 

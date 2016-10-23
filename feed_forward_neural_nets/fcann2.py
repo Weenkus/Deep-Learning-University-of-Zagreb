@@ -22,7 +22,7 @@ def main():
     data.graph_surface(fcann2_decfun(X, model), bbox, offset=0)
     data.graph_data(X, Y_, Y)
 
-    # show the results
+    # show the resultsfcann2_train
     #plt.savefig('fcann2_classification.png')
     plt.show()
 
