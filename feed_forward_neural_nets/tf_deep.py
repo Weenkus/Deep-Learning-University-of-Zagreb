@@ -27,7 +27,7 @@ def main():
 
     # Plot the results
     bbox = (np.min(X, axis=0), np.max(X, axis=0))
-    data.graph_surface(tflogreg_classify(X, tf_deep), bbox, offset=0)
+    data.graph_surface(td_classify(X, tf_deep), bbox, offset=0)
     data.graph_data(X, Y_, tf_deep.predict(X))
 
     # show the results
@@ -35,7 +35,7 @@ def main():
     plt.show()
 
 
-def tflogreg_classify(X, model):
+def td_classify(X, model):
     def classify(X):
         return model.predict(X)
     return classify
@@ -103,12 +103,13 @@ class TFDeep(object):
 
         for iteration in range(param_niter):
 
-            _, loss, pred = self.sess.run(
-                [self.optimizer, self.loss, self.pred],
+            _, loss, pred, weights = self.sess.run(
+                [self.optimizer, self.loss, self.pred, self.W],
                 feed_dict={self.X: X, self.Yoh_: Yoh_}
             )
 
-            print(iteration, loss)
+            self.weights = weights
+            print('Iteration: {0}, loss: {1}'.format(iteration, loss))
 
     def eval(self, X, Yoh_):
         correct_prediction = tf.equal(tf.argmax(self.pred, 1), tf.argmax(self.Yoh_, 1))
@@ -119,6 +120,9 @@ class TFDeep(object):
     def predict(self, X):
         probs = self.sess.run(self.pred, feed_dict={self.X: X})
         return np.argmax(probs, axis=1)
+
+    def get_weights(self):
+        return self.weights
 
 
 if __name__ == '__main__':
