@@ -9,7 +9,7 @@ def main():
     tf.set_random_seed(100)
 
     # Init the dataset
-    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=20)
+    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=4, N=20)
 
     # Construct the computing graph
     tflr = TFLogreg(X.shape[1], Yoh_.shape[1], param_delta=0.5)

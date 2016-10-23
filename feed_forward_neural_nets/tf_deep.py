@@ -9,7 +9,7 @@ def main():
     tf.set_random_seed(100)
 
     # Init the dataset
-    class_num = 2
+    class_num = 3
     X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=class_num, N=40)
 
     # Construct the computing graph
@@ -22,7 +22,7 @@ def main():
 
     tf_deep.count_params()
 
-    tf_deep.train(X, Yoh_, param_niter=10000)
+    tf_deep.train(X, Yoh_, param_niter=1000)
     tf_deep.eval(X, Yoh_)
 
     # Plot the results
