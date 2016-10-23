@@ -114,12 +114,13 @@ def eval_AP(Y_sorted):
     return 0.5
 
 
-def graph_data(X, Y_, Y):
+def graph_data(X, Y_, Y, special=None):
     predictions = ['o' if y == y_ else 's' for y, y_ in zip(Y_, Y)]
     for i, prediction in enumerate(predictions):
 
         color = 'grey' if Y_[i] == 0 else 'white'
-        plt.scatter(X[i][0], X[i][1], marker=prediction, s=40, c=color)
+        dot_size = 60 if special and i in special else 30
+        plt.scatter(X[i][0], X[i][1], marker=prediction, s=dot_size, c=color)
 
 
 def myDummyDecision(X):
