@@ -10,18 +10,17 @@ def main():
 
     # Init the dataset
     class_num = 2
-    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=class_num, N=10)
+    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=class_num, N=40)
 
     # Construct the computing graph
     tf_deep = TFDeep(
         nn_configuration=[2, 10, 10, class_num],
         param_delta=0.1,
         param_lambda=1e-4,
-        no_linearity_function=tf.nn.relu
+        no_linearity_function=tf.nn.tanh
     )
 
     tf_deep.count_params()
-    exit(0)
 
     tf_deep.train(X, Yoh_, param_niter=10000)
     tf_deep.eval(X, Yoh_)
@@ -32,7 +31,7 @@ def main():
     data.graph_data(X, Y_, tf_deep.predict(X))
 
     # show the results
-    #plt.savefig('tf_deep_classification.png')
+    #plt.savefig('tf_deep_data_sigmoid.png')
     plt.show()
 
 
@@ -46,9 +45,10 @@ class TFDeep(object):
 
     def __init__(self, nn_configuration, param_delta, param_lambda, no_linearity_function):
         self.nn_configuration = nn_configuration
+        self.param_lambda = param_lambda
         self.dimension_num = nn_configuration[0]
         self.class_num = nn_configuration[-1]
-        self.no_linearity_function = no_linearity_function
+        self.activation_function = no_linearity_function
 
         self.X = tf.placeholder(tf.float32, [None, self.dimension_num])
         self.Yoh_ = tf.placeholder(tf.float32, [None, self.class_num])
@@ -79,9 +79,10 @@ class TFDeep(object):
     def __construct_output(self):
         current_layer_input = self.X
         for layer_index, weight in enumerate(self.W):
-            layer = tf.add(tf.matmul(current_layer_input, weight), self.b[layer_index])
+            regularization = self.param_lambda * tf.nn.l2_loss(weight)
+            layer = tf.add(tf.matmul(current_layer_input, weight), self.b[layer_index]) + regularization
 
-            layer = self.no_linearity_function(layer) if layer_index != len(self.W) - 1 else tf.nn.softmax(layer)
+            layer = self.activation_function(layer) if layer_index != len(self.W) - 1 else tf.nn.softmax(layer)
             current_layer_input = layer
 
         self.pred = current_layer_input
