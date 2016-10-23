@@ -10,20 +10,33 @@ def main():
     tf.set_random_seed(100)
 
     # Init the dataset
-    X, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=10, one_hot=True)
+    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=20)
 
     # Construct the computing graph
     tflr = TFLogreg(X.shape[1], Yoh_.shape[1], 0.5)
 
     tflr.train(X, Yoh_, 1000)
-    probs = tflr.eval(X, Yoh_)
+    tflr.eval(X, Yoh_)
 
-    print(probs)
+    # Plot the results
+    bbox = (np.min(X, axis=0), np.max(X, axis=0))
+    data.graph_surface(tflogreg_classify(X, tflr), bbox, offset=0)
+    data.graph_data(X, Y_, tflr.predict(X))
+
+    # show the results
+    #plt.savefig('tf_logreg_classification.png')
+    plt.show()
+
+
+def tflogreg_classify(X, model):
+    def classify(X):
+        return model.predict(X)
+    return classify
 
 
 class TFLogreg(object):
 
-    def __init__(self, D, C, param_delta=0.05):
+    def __init__(self, D, C, param_delta=1000, param_lambda=0.02):
         self.dimension_num = D
         self.class_num = C
 
@@ -34,10 +47,15 @@ class TFLogreg(object):
         self.b = tf.Variable(tf.zeros([self.class_num]))
 
         self.probs = tf.nn.softmax(tf.matmul(self.X, self.W) + self.b)
-        self.loss = tf.reduce_mean(-tf.reduce_sum(self.Yoh_ * tf.log(self.probs), reduction_indices=1))
+
+        empirical_loss = tf.reduce_mean(-tf.reduce_sum(self.Yoh_ * tf.log(self.probs), reduction_indices=1))
+        regularization = param_lambda * tf.nn.l2_loss(self.W)
+        self.loss = empirical_loss + regularization
+
         self.optimizer = tf.train.GradientDescentOptimizer(param_delta).minimize(self.loss)
 
         self.sess = tf.Session()
+        #self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
     def train(self, X, Yoh_, param_niter):
         init = tf.initialize_all_variables()
@@ -57,6 +75,10 @@ class TFLogreg(object):
         accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
         print("Accuracy:", accuracy.eval({self.X: X, self.Yoh_: Yoh_}, session=self.sess))
         return self.probs
+
+    def predict(self, X):
+        probs = self.sess.run(self.probs, feed_dict={self.X: X})
+        return np.argmax(probs, axis=1)
 
 
 if __name__ == '__main__':

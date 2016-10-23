@@ -5,7 +5,7 @@ import data
 
 def main():
     # create the dataset
-    X, Y_ = data.sample_gmm_2d(K=6, C=2, N=10)
+    X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=10)
     model = fcann2_train(X, Y_)
 
     # fit the model
