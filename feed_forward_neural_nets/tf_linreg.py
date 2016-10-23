@@ -1,7 +1,4 @@
 import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
-import math
 
 
 def main():
@@ -18,12 +15,8 @@ def main():
     loss = (Y-Y_)**2
 
     # Gradients
-    grad_a = 2 * a * (a*X + b - Y_)
+    grad_a = 2 * X * (a*X + b - Y_)
     grad_b = 2 * (a*X + b - Y_)
-
-    # core_inv = tf.matrix_inverse(tf.matmul(X, X, transpose_a=True))
-    # pseudo_inverz = tf.matmul(core_inv, X, transpose_b=True)
-    # grad_w = tf.matmul(pseudo_inverz, Y_)
 
     # Optimization via gradient descent
     direct = False
@@ -43,18 +36,18 @@ def main():
 
     # Train the model
     for i in range(100):
-        val_loss, _, val_a, val_b = sess.run([loss, train_op, a, b], feed_dict=feed_dict)
-        print(i, val_loss,  val_a, val_b)
-
         grads = sess.run(grads_and_vars, feed_dict=feed_dict)
         print('Grads[trainer]:', [g[0] for g in grads])
 
         custom_grad_a, custom_grad_b = sess.run([grad_a, grad_b], feed_dict=feed_dict)
-        print('Gradient a:', custom_grad_a)
-        print('Gradient b:', custom_grad_b)
+        print('Gradient a:', sum(custom_grad_a))
+        print('Gradient b:', sum(custom_grad_b))
 
-        a = tf.Print(custom_grad_a, [custom_grad_a], message="Gradient of a: ")
-        b = tf.Print(custom_grad_b, [custom_grad_b], message="Gradient of b: ")
+        #loss = tf.Print(custom_grad_a, [sum(custom_grad_a)], message="Gradient of a: ")
+        #loss = tf.Print(custom_grad_b, [sum(custom_grad_b)], message="Gradient of b: ")
+
+        val_loss, _, val_a, val_b = sess.run([loss, train_op, a, b], feed_dict=feed_dict)
+        print('Iteration results:', i, val_loss,  val_a, val_b)
         print()
 
 

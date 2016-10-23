@@ -12,18 +12,18 @@ def main():
     X, Y_, Yoh_ = data.sample_gmm_2d(K=6, C=2, N=20)
 
     # Construct the computing graph
-    tflr = TFLogreg(X.shape[1], Yoh_.shape[1], 0.5)
+    tf_deep = TFDeep(X.shape[1], Yoh_.shape[1], 0.5)
 
-    tflr.train(X, Yoh_, 1000)
-    tflr.eval(X, Yoh_)
+    tf_deep.train(X, Yoh_, 1000)
+    tf_deep.eval(X, Yoh_)
 
     # Plot the results
     bbox = (np.min(X, axis=0), np.max(X, axis=0))
-    data.graph_surface(tflogreg_classify(X, tflr), bbox, offset=0)
-    data.graph_data(X, Y_, tflr.predict(X))
+    data.graph_surface(tflogreg_classify(X, tf_deep), bbox, offset=0)
+    data.graph_data(X, Y_, tf_deep.predict(X))
 
     # show the results
-    #plt.savefig('tf_logreg_classification.png')
+    #plt.savefig('tf_deep_classification.png')
     plt.show()
 
 
@@ -33,7 +33,7 @@ def tflogreg_classify(X, model):
     return classify
 
 
-class TFLogreg(object):
+class TFDeep(object):
 
     def __init__(self, D, C, param_delta=1000, param_lambda=0.02):
         self.dimension_num = D
