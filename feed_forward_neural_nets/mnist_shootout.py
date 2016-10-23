@@ -24,18 +24,27 @@ def main():
     Yoh_ = mnist.train.labels
     Y_ = minst_no_oh.train.labels
 
+    Xtest = mnist.test.images
+    Ytest_ = minst_no_oh.test.labels
+
     print(example_number, feature_number, class_num)
 
     # Construct the computing graph
     deep_model = td.TFDeep(
-        nn_configuration=[feature_number, class_num],
+        nn_configuration=[feature_number, 100, class_num],
         param_delta=0.5,
         param_lambda=1e-4,
         no_linearity_function=tf.nn.tanh
     )
 
-    deep_model.train(X, Yoh_, param_niter=100)
+    deep_model.train(X, Yoh_, param_niter=5000)
     deep_model.eval(X, Yoh_)
+
+    accuracy, recall, precision = data.eval_perf_binary(deep_model.predict(X), Y_)
+    print('TRAINING\nAcc: {0}\nRecall: {1}\nPrecision: {2}\n'.format(accuracy, recall, precision))
+
+    accuracy, recall, precision = data.eval_perf_binary(deep_model.predict(Xtest), Ytest_)
+    print('\nTEST\nAcc: {0}\nRecall: {1}\nPrecision: {2}\n'.format(accuracy, recall, precision))
 
     print_all_numbers(deep_model)
 
