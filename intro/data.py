@@ -14,7 +14,7 @@ def main():
 
     # create the dataset
     X, Y_ = sample_gauss_2d(2, 100)
-    w, b = binlogreg.binlogreg_train(X, Y_)
+    w, b = binlogreg.binlogreg_train(X, Y_, animate=False)
 
     # fit the model
     probabilities = binlogreg.binlogreg_classify(X, w, b)
@@ -32,7 +32,7 @@ def main():
 
     # show the results
     #plt.savefig('Binary_logistic_regression_classification.png')
-    plt.show()
+    #plt.show()
 
 
 class Random2DGaussian(object):
@@ -122,7 +122,7 @@ def graph_surface(fun, rect, offset=0.5, width=1000, height=800, resolution=400)
 
     Z = fun(coordinate_net)
     Z = Z.reshape(xx.shape)
-    plt.figure(figsize=(60, 40))
+    plt.figure(figsize=(16, 9))
     plt.pcolormesh(xx, yy, Z, vmin=0, vmax=1)
     plt.colorbar()
 

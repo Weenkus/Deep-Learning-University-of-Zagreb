@@ -29,7 +29,7 @@ def binlogreg_train(X, Y_, param_niter=500, param_delta=0.2, animate=False):
         probabilities = 1. / (1 + np.exp(-scores))  # class probabilities c_1 # N x 1
         loss = np.sum(-np.log(probabilities))  # scalar
 
-        if i % 20 == 0:
+        if i % 3 == 0:
             print("iteration {}: loss {}".format(i, loss))
 
             if animate:
