@@ -22,7 +22,7 @@ def main():
 
     tf_deep.count_params()
 
-    tf_deep.train(X, Yoh_, param_niter=1000)
+    tf_deep.train(X, Yoh_, param_niter=30000)
     tf_deep.eval(X, Yoh_)
 
     # Plot the results
