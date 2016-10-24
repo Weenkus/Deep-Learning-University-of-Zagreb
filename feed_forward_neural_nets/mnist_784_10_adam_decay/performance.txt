@@ -1,0 +1,21 @@
+deep_model = td.TFDeep(
+    nn_configuration=[feature_number, class_num],
+    param_delta=0.2,
+    param_lambda=0,
+    no_linearity_function=tf.nn.relu,
+    adam=True,
+    decay=True
+)
+
+deep_model.train_mb(mnist, epoch_number=100, batch_size=100)
+deep_model.eval(X, Yoh_)
+
+TRAINING
+Acc: 0.9179272727272727
+Recall: 0.9179272727272727
+Precision: 0.9193397122409466
+
+TEST
+Acc: 0.9148
+Recall: 0.9148
+Precision: 0.9161873786995242

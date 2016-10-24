@@ -31,13 +31,16 @@ def main():
 
     # Construct the computing graph
     deep_model = td.TFDeep(
-        nn_configuration=[feature_number, 100, class_num],
-        param_delta=0.5,
-        param_lambda=1e-4,
-        no_linearity_function=tf.nn.tanh
+        nn_configuration=[feature_number, class_num],
+        param_delta=0.2,
+        param_lambda=0,
+        no_linearity_function=tf.nn.relu,
+        adam=True,
+        decay=True
     )
 
-    deep_model.train(X, Yoh_, param_niter=5000)
+    #deep_model.train(X, Yoh_, param_niter=10)
+    deep_model.train_mb(mnist, epoch_number=100, batch_size=100)
     deep_model.eval(X, Yoh_)
 
     accuracy, recall, precision = data.eval_perf_binary(deep_model.predict(X), Y_)
@@ -51,7 +54,7 @@ def main():
 
 def print_all_numbers(model, class_num=10):
     weights = model.get_weights()
-    numbers = [weights[0][:, i].reshape(28, 28) for i in range(class_num)]
+    numbers = [weights[0][:, i].reshape(28, 28, order='F') for i in range(class_num)]
 
     for i in range(class_num):
         plt.imshow(numbers[i], cmap=plt.get_cmap('gray'), vmin=0, vmax=1)

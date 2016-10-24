@@ -43,7 +43,7 @@ def td_classify(X, model):
 
 class TFDeep(object):
 
-    def __init__(self, nn_configuration, param_delta, param_lambda, no_linearity_function):
+    def __init__(self, nn_configuration, param_delta, param_lambda, no_linearity_function, adam=False, decay=False):
         self.nn_configuration = nn_configuration
         self.param_lambda = param_lambda
         self.dimension_num = nn_configuration[0]
@@ -57,7 +57,22 @@ class TFDeep(object):
         self.__construct_output()
 
         self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.pred, self.Yoh_))
-        self.optimizer = tf.train.GradientDescentOptimizer(param_delta).minimize(self.loss)
+        for layer_component in self.W + self.b:
+            self.loss += param_lambda * tf.nn.l2_loss(layer_component)
+
+        if decay:
+            param_delta = tf.train.exponential_decay(
+                learning_rate=param_delta,
+                global_step=100 * 100,
+                decay_steps=56000,
+                decay_rate=0.95,
+                staircase=True
+            )
+
+        if adam:
+            self.optimizer = tf.train.AdamOptimizer(param_delta).minimize(self.loss)
+        else:
+            self.optimizer = tf.train.GradientDescentOptimizer(param_delta).minimize(self.loss)
 
         self.sess = tf.Session()
 
@@ -110,6 +125,28 @@ class TFDeep(object):
 
             self.weights = weights
             print('Iteration: {0}, loss: {1}'.format(iteration, loss))
+
+    def train_mb(self, mnist, epoch_number, batch_size):
+        init = tf.initialize_all_variables()
+        self.sess.run(init)
+
+        for iteration in range(epoch_number):
+            batch_num = int(mnist.train.num_examples/batch_size)
+            avg_loss = 0
+
+            for i in range(batch_num):
+                batch_x, batch_y = mnist.train.next_batch(batch_size)
+
+                _, loss, pred, weights = self.sess.run(
+                    [self.optimizer, self.loss, self.pred, self.W],
+                    feed_dict={self.X: batch_x, self.Yoh_: batch_y}
+                )
+
+                avg_loss += loss / batch_num
+
+            self.weights = weights
+            print('Epoch: {0}, loss: {1}'.format(iteration, avg_loss))
+
 
     def eval(self, X, Yoh_):
         correct_prediction = tf.equal(tf.argmax(self.pred, 1), tf.argmax(self.Yoh_, 1))
