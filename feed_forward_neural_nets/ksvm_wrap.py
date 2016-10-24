@@ -24,8 +24,7 @@ def main():
     plt.show()
 
     accuracy, recall, precision = data.eval_perf_binary(svm.predict(X), Y_)
-    AP = 0.5
-    print('Acc: {0}\nRecall: {1}\nPrecision: {2}\nAP: {3}\n'.format(accuracy, recall, precision, AP))
+    print('Acc: {0}\nRecall: {1}\nPrecision: {2}\n'.format(accuracy, recall, precision))
 
     svm.get_scores()
 

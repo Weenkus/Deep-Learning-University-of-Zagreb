@@ -135,7 +135,6 @@ def graph_surface(fun, rect, offset=0.5, width=1000, height=800, resolution=400)
     xx, yy = np.meshgrid(np.linspace(x_min, x_max, resolution), np.linspace(y_min, y_max, resolution))
     coordinate_net = np.vstack((xx.ravel(), yy.ravel())).T
 
-    print(xx.shape)
     print(fun(coordinate_net), len(fun(coordinate_net)))
     Z = fun(coordinate_net).reshape(xx.shape)
     plt.figure(figsize=(16, 8))

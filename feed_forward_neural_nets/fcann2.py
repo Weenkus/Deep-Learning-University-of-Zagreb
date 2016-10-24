@@ -14,8 +14,7 @@ def main():
 
     # evaluate the model
     accuracy, recall, precision = data.eval_perf_binary(Y, Y_)
-    AP = data.eval_AP(Y_[probabilities.argsort()])
-    print('Acc: {0}\nRecall: {1}\nPrecision: {2}\nAP: {3}\n'.format(accuracy, recall, precision, AP))
+    print('Acc: {0}\nRecall: {1}\nPrecision: {2}\n'.format(accuracy, recall, precision))
 
     # graph the data points
     bbox = (np.min(X, axis=0), np.max(X, axis=0))
