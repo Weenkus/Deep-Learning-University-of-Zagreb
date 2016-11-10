@@ -78,7 +78,7 @@ class TFConvNet(object):
             net = layers.convolution2d(net, num_outputs=16, kernel_size=5, scope='conv2')
 
             net = layers.flatten(net, [-1, 7 * 7 * 16])
-            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.relu, scope='fc1')
+            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.tanh, scope='fc1')
 
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
@@ -91,7 +91,7 @@ class TFConvNet(object):
 
         self.sess = tf.Session()
 
-    def train(self, X_train, y_train, X_test, y_test, epochs=2500, batch_size=50):
+    def train(self, X_train, y_train, X_test, y_test, epochs=50000, batch_size=50):
         print("Starting to train")
         self.sess.run(tf.initialize_all_variables())
 
@@ -119,7 +119,7 @@ class TFConvNet(object):
                         iteration, loss, train_acc, val_acc)
                 )
 
-                if val_acc >= 0.985:
+                if val_acc >= 0.995:
                     print('Validation acc is great')
                     break
 
