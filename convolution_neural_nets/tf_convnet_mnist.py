@@ -43,7 +43,7 @@ def create_dataset(dataset):
 
 
 class TFConvNet(object):
-    def __init__(self, feature_num, class_num, is_training):
+    def __init__(self, feature_num, class_num, is_training, step=0.001):
         self.weight_decay = 1e-3
         self.bn_params = {
             # Decay for the moving averages.
@@ -73,40 +73,55 @@ class TFConvNet(object):
             self.X = tf.reshape(self.X, [-1, 28, 28, 1])
 
             net = layers.convolution2d(self.X, num_outputs=8, kernel_size=5, scope='conv1')
-            net = layers.max_pool2d(net, kernel_size=2, stride=2, scope='pool1')
+            net = layers.max_pool2d(net, kernel_size=2, scope='pool1')
+
             net = layers.convolution2d(net, num_outputs=16, kernel_size=5, scope='conv2')
+
             net = layers.flatten(net, [-1, 7 * 7 * 16])
             net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.relu, scope='fc1')
+
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
 
         self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.y, self.y_))
-        self.optimizer = tf.train.AdamOptimizer(0.001).minimize(self.loss)
+        self.optimizer = tf.train.AdamOptimizer(step).minimize(self.loss)
 
         pred = tf.equal(tf.argmax(self.y, 1), tf.argmax(self.y_, 1))
         self.acc = tf.reduce_mean(tf.cast(pred, tf.float32))
 
         self.sess = tf.Session()
 
-    def train(self, X_train, y_train, X_test, y_test, epohes=2000, batch_size=50):
+    def train(self, X_train, y_train, X_test, y_test, epochs=2500, batch_size=50):
         print("Starting to train")
         self.sess.run(tf.initialize_all_variables())
 
         batch_start = 0
         batch_end = batch_start + batch_size
-        for iteration in range(epohes):
+        for iteration in range(epochs):
             _, loss, probs = self.sess.run(
                 [self.optimizer, self.loss, self.y],
                 feed_dict={self.X: X_train[batch_start:batch_end], self.y_: y_train[batch_start:batch_end]}
             )
 
             if iteration % 100 == 0:
-                acc = self.sess.run(
+                train_acc = self.sess.run(
                     self.acc,
                     feed_dict={self.X: X_train[batch_start:batch_end], self.y_: y_train[batch_start:batch_end]}
                 )
 
-                print('Iteration: {}, loss: {:2.4}, train acc: {:.2%}'.format(iteration, loss, acc))
+                val_acc = self.sess.run(
+                    self.acc,
+                    feed_dict={self.X: X_test, self.y_: y_test}
+                )
+
+                print(
+                    'Epoch: {}, train loss: {:2.4}, train acc: {:.2%}, validation acc: {:.2%}'.format(
+                        iteration, loss, train_acc, val_acc)
+                )
+
+                if val_acc >= 0.985:
+                    print('Validation acc is great')
+                    break
 
             batch_start = batch_end
             batch_end += batch_size
@@ -117,13 +132,6 @@ class TFConvNet(object):
                 X_train, y_train = self.__shuffle(X_train, y_train)
 
         print("Training ended")
-
-        acc = self.sess.run(
-            self.acc,
-            feed_dict={self.X: X_test, self.y_: y_test}
-        )
-
-        print("Test acc:", acc)
 
     def __shuffle(self, a, b):
         p = np.random.permutation(len(a))
