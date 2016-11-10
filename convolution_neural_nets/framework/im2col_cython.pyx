@@ -4,8 +4,8 @@ import numpy as np
 cimport numpy as np
 cimport cython
 
-# DTYPE = np.float64
-# ctypedef np.float64_t DTYPE_t
+#DTYPE = np.float64
+#ctypedef np.float64_t DTYPE_t
 
 ctypedef fused DTYPE_t:
     np.float32_t

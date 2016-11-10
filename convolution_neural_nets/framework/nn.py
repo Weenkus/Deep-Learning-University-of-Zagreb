@@ -13,9 +13,9 @@ def forward_pass(net, inputs):
     return output
 
 
-def backward_pass(net, loss):
+def backward_pass(net, loss, x, y):
     grads = []
-    grad_out = loss.backward_inputs()
+    grad_out = loss.backward_inputs(x, y)
     if loss.has_params:
         grads += loss.backward_params()
     for layer in reversed(net):
@@ -66,6 +66,7 @@ def train(train_x, train_y, valid_x, valid_y, net, loss, config):
     max_epochs = config['max_epochs']
     save_dir = config['save_dir']
     num_examples = train_x.shape[0]
+    assert num_examples % batch_size == 0
     num_batches = num_examples // batch_size
     for epoch in range(1, max_epochs + 1):
         if epoch in lr_policy:
@@ -82,12 +83,12 @@ def train(train_x, train_y, valid_x, valid_y, net, loss, config):
             batch_x = train_x[i * batch_size:(i + 1) * batch_size, :]
             batch_y = train_y[i * batch_size:(i + 1) * batch_size, :]
             logits = forward_pass(net, batch_x)
-            loss_val = loss.forward(logits, batch_y) / batch_size
+            loss_val = loss.forward(logits, batch_y)
             # compute classification accuracy
             yp = np.argmax(logits, 1)
             yt = np.argmax(batch_y, 1)
             cnt_correct += (yp == yt).sum()
-            grads = backward_pass(net, loss)
+            grads = backward_pass(net, loss, logits, batch_y)
             sgd_update_params(grads, solver_config)
 
             if i % 5 == 0:
@@ -106,6 +107,7 @@ def evaluate(name, x, y, net, loss, config):
     print("\nRunning evaluation: ", name)
     batch_size = config['batch_size']
     num_examples = x.shape[0]
+    assert num_examples % batch_size == 0
     num_batches = num_examples // batch_size
     cnt_correct = 0
     loss_avg = 0
@@ -120,6 +122,6 @@ def evaluate(name, x, y, net, loss, config):
         loss_avg += loss_val
         # print("step %d / %d, loss = %.2f" % (i*batch_size, num_examples, loss_val / batch_size))
     valid_acc = cnt_correct / num_examples * 100
-    loss_avg /= num_examples
+    loss_avg /= num_batches
     print(name + " accuracy = %.2f" % valid_acc)
     print(name + " avg loss = %.2f\n" % loss_avg)

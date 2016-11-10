@@ -111,8 +111,8 @@ class TFConvNet(object):
             net = layers.convolution2d(net, num_outputs=8, kernel_size=[5, 1], scope='conv2')
             net = layers.max_pool2d(net, kernel_size=2, scope='pool1')
 
-            net = layers.convolution2d(net, num_outputs=16, kernel_size=[1, 5], scope='conv4')
-            net = layers.convolution2d(net, num_outputs=16, kernel_size=[5, 1], scope='conv5')
+            net = layers.convolution2d(net, num_outputs=16, kernel_size=[1, 5], scope='conv3')
+            net = layers.convolution2d(net, num_outputs=16, kernel_size=[5, 1], scope='conv4')
             net = layers.max_pool2d(net, kernel_size=2, scope='pool2')
 
             net = layers.flatten(net, [-1, 8 * 8 * 16])
