@@ -149,8 +149,8 @@ class MaxPooling(Layer):
         dout_newaxis = grad_out[:, :, :, np.newaxis, :, np.newaxis]
         dout_broadcast, _ = np.broadcast_arrays(dout_newaxis, grad_x)
         grad_x[mask] = dout_broadcast[mask]
-        print(np.sum(mask, axis=(3, 5), keepdims=True))
-        print(np.sum(mask, axis=(3, 5), keepdims=True).shape)
+        #print(np.sum(mask, axis=(3, 5), keepdims=True))
+        #print(np.sum(mask, axis=(3, 5), keepdims=True).shape)
         grad_x /= np.sum(mask, axis=(3, 5), keepdims=True)
         grad_x = grad_x.reshape(self.input_shape)
         return grad_x
@@ -199,6 +199,7 @@ class FC(Layer):
         self.bias = bias_initializer_fn([num_outputs])
         self.name = name
         self.has_params = True
+        self.inputs = None
 
     def forward(self, inputs):
         """
@@ -207,8 +208,9 @@ class FC(Layer):
         Returns:
           An ndarray of shape (N, num_outputs)
         """
-        output = np.dot(self.weights, inputs.T) + self.bias[:, None]
-        return output.T
+        self.inputs = inputs
+        output = np.dot(inputs, self.weights.T) + self.bias
+        return output
 
     def backward_inputs(self, grads):
         """
@@ -217,7 +219,7 @@ class FC(Layer):
         Returns:
           An ndarray of shape (N, num_inputs)
         """
-        return np.dot(self.weights.T, grads.T)
+        return np.dot(grads, self.weights)
 
     def backward_params(self, grads):
         """
@@ -226,8 +228,8 @@ class FC(Layer):
         Returns:
           List of params and gradient pairs.
         """
-        grad_weights = np.sum(self.weights, grads.T)
-        grad_bias = np.sum(grads)
+        grad_weights = np.dot(grads.T, self.inputs)
+        grad_bias = np.sum(grads, axis=0)
         return [[self.weights, grad_weights], [self.bias, grad_bias], self.name]
 
 
@@ -236,6 +238,7 @@ class ReLU(Layer):
         self.shape = input_layer.shape
         self.name = name
         self.has_params = False
+        self.mask = None
 
     def forward(self, inputs):
         """
@@ -244,7 +247,9 @@ class ReLU(Layer):
         Returns:
           ndarray of shape (N, C, H, W).
         """
-        return np.maximum(0, inputs)
+        out = np.maximum(0, inputs)
+        self.mask = inputs
+        return out
 
     def backward_inputs(self, grads):
         """
@@ -253,12 +258,13 @@ class ReLU(Layer):
         Returns:
           ndarray of shape (N, C, H, W).
         """
-        return np.sum(grads)
+        return grads * (self.mask >= 0)
 
 
 class SoftmaxCrossEntropyWithLogits():
     def __init__(self):
         self.has_params = False
+        self.probs = None
 
     def forward(self, x, y):
         """
@@ -271,7 +277,12 @@ class SoftmaxCrossEntropyWithLogits():
           because then learning rate and weight decay won't depend on batch size.
 
         """
-        return - np.average(x*np.log(y))
+        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+        self.probs = exp_x / np.sum(exp_x, axis=1, keepdims=True)
+        N = x.shape[0]
+
+        loss = - np.average(np.log(self.probs[range(N), np.where(y == 1)[1]]))
+        return loss
 
     def backward_inputs(self, x, y):
         """
@@ -282,7 +293,10 @@ class SoftmaxCrossEntropyWithLogits():
           Gradient with respect to the x, ndarray of shape (N, num_classes).
         """
         # Hint: don't forget that we took the average in the forward pass
-        return y - x
+        N = x.shape[0]
+        probs = self.probs.copy()
+        probs[range(N), np.where(y == 1)[1]] -= 1
+        return probs / N
 
 
 class L2Regularizer():
@@ -314,7 +328,7 @@ class L2Regularizer():
         return [[self.weights, grad_weights], self.name]
 
 
-class RegularizedLoss():
+class RegularizedLoss(object):
     def __init__(self, data_loss, regularizer_losses):
         self.data_loss = data_loss
         self.regularizer_losses = regularizer_losses
