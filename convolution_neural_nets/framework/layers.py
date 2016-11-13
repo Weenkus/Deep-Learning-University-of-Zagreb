@@ -261,7 +261,7 @@ class ReLU(Layer):
         return grads * (self.mask >= 0)
 
 
-class SoftmaxCrossEntropyWithLogits():
+class SoftmaxCrossEntropyWithLogits(object):
     def __init__(self):
         self.has_params = False
         self.probs = None
@@ -299,7 +299,7 @@ class SoftmaxCrossEntropyWithLogits():
         return probs / N
 
 
-class L2Regularizer():
+class L2Regularizer(object):
     def __init__(self, weights, weight_decay, name):
         """
         Args:
@@ -317,14 +317,16 @@ class L2Regularizer():
          Returns:
           Scalar, loss due to the L2 regularization.
         """
-        return self.weights * self.weight_decay
+        lambda_param = self.weight_decay * 0.5
+        loss = lambda_param * np.sum(np.dot(self.weights.T, self.weights))
+        return loss
 
     def backward_params(self):
         """
         Returns:
           Gradient of the L2 loss with respect to the regularized weights.
         """
-        grad_weights = np.sum(self.weights)
+        grad_weights = self.weight_decay * self.weights
         return [[self.weights, grad_weights], self.name]
 
 

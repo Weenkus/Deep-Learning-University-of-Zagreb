@@ -78,12 +78,12 @@ class TFConvNet(object):
             net = layers.convolution2d(net, num_outputs=16, kernel_size=5, scope='conv2')
 
             net = layers.flatten(net, [-1, 7 * 7 * 16])
-            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.tanh, scope='fc1')
+            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.relu, scope='fc1')
 
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
 
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.y, self.y_))
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(net, self.y_))
         self.optimizer = tf.train.AdamOptimizer(step).minimize(self.loss)
 
         pred = tf.equal(tf.argmax(self.y, 1), tf.argmax(self.y_, 1))

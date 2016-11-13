@@ -9,7 +9,7 @@ import nn
 import layers
 
 DATA_DIR = '/home/weenkus/datasets/MNIST/'
-SAVE_DIR = "/home/weenkus/source/fer/out/"
+SAVE_DIR = '/home/weenkus/datasets/MNIST/'
 
 config = {}
 config['max_epochs'] = 8

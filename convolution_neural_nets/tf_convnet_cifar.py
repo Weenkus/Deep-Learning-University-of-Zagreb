@@ -46,11 +46,11 @@ def create_dataset(data_dir, img_height, img_width, num_channels):
         subset = unpickle(os.path.join(data_dir, 'data_batch_%d' % i))
         train_x = np.vstack((train_x, subset['data']))
         train_y += subset['labels']
-    train_x = train_x.reshape((-1, img_height, img_width, num_channels))
+    train_x = train_x.reshape((-1, num_channels, img_height, img_width)).transpose(0, 2, 3, 1)
     train_y = np.array(train_y, dtype=np.int32)
 
     subset = unpickle(os.path.join(data_dir, 'test_batch'))
-    test_x = subset['data'].reshape((-1, img_height, img_width, num_channels)).astype(np.float32)
+    test_x = subset['data'].reshape((-1, num_channels, img_height, img_width)).transpose(0, 2, 3, 1)
     test_y = np.array(subset['labels'], dtype=np.int32)
 
     valid_size = 5000
@@ -120,7 +120,7 @@ class TFConvNet(object):
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
 
-        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(self.y, self.y_))
+        self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(net, self.y_))
         self.optimizer = tf.train.AdamOptimizer(step).minimize(self.loss)
 
         pred = tf.equal(tf.argmax(self.y, 1), tf.argmax(self.y_, 1))
