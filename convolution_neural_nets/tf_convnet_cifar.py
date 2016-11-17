@@ -3,6 +3,8 @@ import pickle
 import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
+from sklearn.metrics import confusion_matrix, accuracy_score
+import matplotlib.pyplot as plt
 
 
 def main():
@@ -46,11 +48,11 @@ def create_dataset(data_dir, img_height, img_width, num_channels):
         subset = unpickle(os.path.join(data_dir, 'data_batch_%d' % i))
         train_x = np.vstack((train_x, subset['data']))
         train_y += subset['labels']
-    train_x = train_x.reshape((-1, num_channels, img_height, img_width)).transpose(0, 2, 3, 1)
+    train_x = train_x.reshape((-1, img_height, img_width, num_channels))
     train_y = np.array(train_y, dtype=np.int32)
 
     subset = unpickle(os.path.join(data_dir, 'test_batch'))
-    test_x = subset['data'].reshape((-1, num_channels, img_height, img_width)).transpose(0, 2, 3, 1)
+    test_x = subset['data'].reshape((-1, img_width, img_height, num_channels)).astype(np.float32)
     test_y = np.array(subset['labels'], dtype=np.int32)
 
     valid_size = 5000
@@ -94,9 +96,12 @@ class TFConvNet(object):
 
         self.feature_num = feature_num
         self.class_num = class_num
+        self.learning_rate = step
 
         self.X = tf.placeholder(tf.float32, [None, feature_num])
         self.y_ = tf.placeholder(tf.float32, [None, class_num])
+
+        self.chart, = plt.plot([], [])
 
         with tf.contrib.framework.arg_scope(
                 [layers.convolution2d],
@@ -110,19 +115,24 @@ class TFConvNet(object):
             net = layers.convolution2d(self.X, num_outputs=8, kernel_size=[1, 5], scope='conv1')
             net = layers.convolution2d(net, num_outputs=8, kernel_size=[5, 1], scope='conv2')
             net = layers.max_pool2d(net, kernel_size=2, scope='pool1')
+            net = layers.relu(net, num_outputs=8)
 
             net = layers.convolution2d(net, num_outputs=16, kernel_size=[1, 5], scope='conv3')
             net = layers.convolution2d(net, num_outputs=16, kernel_size=[5, 1], scope='conv4')
             net = layers.max_pool2d(net, kernel_size=2, scope='pool2')
+            net = layers.relu(net, num_outputs=16)
 
             net = layers.flatten(net, [-1, 8 * 8 * 16])
-            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.tanh, scope='fc1')
+            net = layers.fully_connected(net, num_outputs=64, activation_fn=tf.nn.relu, scope='fc1')
+            net = layers.relu(net, num_outputs=8)
+
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
 
         self.loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(net, self.y_))
-        self.optimizer = tf.train.AdamOptimizer(step).minimize(self.loss)
+        self.optimizer = tf.train.AdamOptimizer(self.learning_rate).minimize(self.loss)
 
+        self.class_output = tf.argmax(self.y, 1)
         pred = tf.equal(tf.argmax(self.y, 1), tf.argmax(self.y_, 1))
         self.acc = tf.reduce_mean(tf.cast(pred, tf.float32))
 
@@ -157,6 +167,8 @@ class TFConvNet(object):
                         iteration, loss, train_acc, val_acc)
                 )
 
+                self.evaluate(X_test, y_test, iteration)
+
                 if val_acc >= 0.995:
                     print('Validation acc is great')
                     break
@@ -169,6 +181,16 @@ class TFConvNet(object):
                 batch_end = batch_start + batch_size
 
         print("Training ended")
+
+    def evaluate(self, X, y, iteration):
+        acc, y_pred = self.sess.run([self.acc, self.class_output], feed_dict={self.X: X, self.y_: y})
+
+        y_not_hot = list(map(np.argmax, y))
+        conf_matrix = confusion_matrix(y_not_hot, y_pred)
+
+
+        print('Acc:', acc)
+        print(conf_matrix)
 
 
 if __name__ == '__main__':

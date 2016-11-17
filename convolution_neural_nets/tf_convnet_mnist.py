@@ -72,13 +72,17 @@ class TFConvNet(object):
         ):
             self.X = tf.reshape(self.X, [-1, 28, 28, 1])
 
-            net = layers.convolution2d(self.X, num_outputs=8, kernel_size=5, scope='conv1')
+            net = layers.convolution2d(self.X, num_outputs=16, scope='conv1')
             net = layers.max_pool2d(net, kernel_size=2, scope='pool1')
+            net = layers.relu(net, num_outputs=16)
 
-            net = layers.convolution2d(net, num_outputs=16, kernel_size=5, scope='conv2')
+            net = layers.convolution2d(net, num_outputs=32, scope='conv2')
+            net = layers.max_pool2d(net, kernel_size=2, scope='pool2')
+            net = layers.relu(net, num_outputs=32)
 
-            net = layers.flatten(net, [-1, 7 * 7 * 16])
-            net = layers.fully_connected(net, num_outputs=32, activation_fn=tf.nn.relu, scope='fc1')
+            net = layers.flatten(net, [-1, 7 * 7 * 32])
+            net = layers.fully_connected(net, num_outputs=512, activation_fn=tf.nn.relu, scope='fc1')
+            net = layers.relu(net, num_outputs=512)
 
             net = layers.fully_connected(net, num_outputs=self.class_num, scope='fc2')
             self.y = layers.softmax(net, scope='softmax')
