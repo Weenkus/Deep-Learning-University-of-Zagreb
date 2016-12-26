@@ -49,14 +49,16 @@ class Parser(object):
         self.num_batches = int(len(self.x) / (self.batch_size * sequence_length))
 
         print 'Number of batches: {0}'.format(self.num_batches)
+        print 'Batch size: {0}'.format(self.batch_size)
+        print 'Input sample: {0}...'.format(self.x[:20])
 
-        for batch_start_index in range(0, self.num_batches, self.batch_size):
-            batch_end_index = batch_start_index + self.batch_size
+        for batch_start_index in range(0, self.num_batches, self.batch_size * sequence_length):
+            batch_end_index = batch_start_index + (self.batch_size * sequence_length)
+            X = np.array(self.x[batch_start_index:batch_end_index])
+            y = np.array(self.x[batch_start_index+1:batch_end_index+1])
 
-            data_X = self.x[batch_start_index:batch_end_index]
-            data_y = self.x[batch_start_index+1:batch_end_index+1]
-
-            self.batches.append([data_X, data_y])
+            data_shape = (batch_size, sequence_length)
+            self.batches.append((np.reshape(X, data_shape), np.reshape(y, data_shape)))
 
     def minibatch_generator(self):
         for epoch, batch in enumerate(self.batches):
@@ -67,10 +69,13 @@ class Parser(object):
 def main():
     parser = Parser('data/selected_conversations.txt')
     parser.preprocess()
-    parser.create_minibatches(batch_size=16, sequence_length=1)
+    parser.create_minibatches(batch_size=4, sequence_length=3)
 
-    for batch in parser.minibatch_generator():
+    for i, batch in enumerate(parser.minibatch_generator()):
         print batch
+
+        if i==5:
+            exit(0)
 
 if __name__ == '__main__':
     main()
