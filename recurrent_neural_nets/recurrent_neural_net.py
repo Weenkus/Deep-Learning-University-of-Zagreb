@@ -49,7 +49,9 @@ class RNN(object):
         # b - bias of shape (hidden size x 1)
 
         cache = (x, h_prev)
-        h_current = np.tanh(np.dot(h_prev, W) + np.dot(x, U)) + b.T
+
+        h_temp = np.tanh(np.dot(x, U) + np.dot(h_prev, W))
+        h_current = np.add(h_temp, b.T)
 
         # return the new hidden state and a tuple of values needed for the backward step
         return h_current, cache
@@ -67,7 +69,7 @@ class RNN(object):
         cache = h = []
         h_previous = h0
         for time_step in range(self.sequence_length):
-            h_current, cache_current = self.__rnn_forward(x[:, time_step], h_previous, U, W, b)
+            h_current, cache_current = self.__rnn_step_forward(x[:, time_step], h_previous, U, W, b)
             h_previous = h_current
 
             cache.append(cache_current)
@@ -210,11 +212,11 @@ class RNN(object):
 
         # update memory matrices
         # perform the Adagrad update of parameters
-        self.U = self.U - self.learning_rate * dU
-        self.W = self.W - self.learning_rate * dW
-        self.b = self.b - self.learning_rate * db
-        self.V = self.V - self.learning_rate * dV
-        self.c = self.c - self.learning_rate * dc
+        self.U -= self.learning_rate * dU
+        self.W -= self.learning_rate * dW
+        self.b -= self.learning_rate * db
+        self.V -= self.learning_rate * dV
+        self.c -= self.learning_rate * dc
 
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
@@ -233,7 +235,7 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
     current_epoch = 0
     batch = 0
 
-    h0 = np.zeros((hidden_size, 1))
+    h0 = np.zeros((batch_size, hidden_size))
 
     average_loss = 0
 
@@ -241,7 +243,7 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
         for e, x, y in parser.minibatch_generator():
             if e:
                 current_epoch += 1
-                h0 = np.zeros((hidden_size, 1))
+                h0 = np.zeros((batch_size, hidden_size))
                 # why do we reset the hidden state here?
 
             # One-hot transform the x and y batches
