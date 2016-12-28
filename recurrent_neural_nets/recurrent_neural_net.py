@@ -228,6 +228,24 @@ class RNN(object):
         self.V -= self.learning_rate * dV
         self.c -= self.learning_rate * dc
 
+    def sample(self, parser, seed, n_sample):
+        h0 = np.zeros((1, self.hidden_size))
+
+        seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
+        seed_oh = np.array(map(self.one_hot, seed_as_id))
+
+        h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
+
+        sample = []
+        for h_current in h:
+            logits = self.__output(h_current, self.V, self.c)
+            out = self.softmax(logits)
+            out = out[0, :]
+            char = parser.decode(np.argmax(out))
+            sample.append(char)
+
+        return ''.join(sample)
+
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
                        batch_size=16):
@@ -271,15 +289,15 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
             losses.append(loss)
 
             if batch % sample_every == 0:
-                # run sampling (2.2)
-                pass
+                sample = rnn.sample(parser, seed="HAN:\nIs that good or bad?\n\n   ", n_sample=300)
+                print sample
             batch += 1
 
         print 'Epoch: {0}, loss: {1}'.format(current_epoch, np.average(losses))
 
 
 def main():
-    run_language_model(max_epochs=1000, learning_rate=1e-1, hidden_size=100, sequence_length=30, batch_size=16)
+    run_language_model(max_epochs=10, learning_rate=1e-1, hidden_size=100, sequence_length=30, batch_size=1)
 
 if __name__ == '__main__':
     main()

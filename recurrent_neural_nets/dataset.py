@@ -38,11 +38,11 @@ class Parser(object):
 
     def encode(self, sequence):
         # returns the sequence encoded as integers
-        return map(self.char2id, sequence)
+        return map(self.char2id.get, sequence)
 
     def decode(self, encoded_sequence):
         # returns the sequence decoded as letters
-        return map(self.id2char, encoded_sequence)
+        return self.id2char[encoded_sequence]
 
     def create_minibatches(self, batch_size, sequence_length):
         self.batch_size = batch_size
