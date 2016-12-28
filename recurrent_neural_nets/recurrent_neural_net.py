@@ -297,7 +297,7 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
 
 
 def main():
-    run_language_model(max_epochs=10, learning_rate=1e-1, hidden_size=100, sequence_length=30, batch_size=1)
+    run_language_model(max_epochs=30, learning_rate=1e-1, hidden_size=200, sequence_length=30, batch_size=1)
 
 if __name__ == '__main__':
     main()
