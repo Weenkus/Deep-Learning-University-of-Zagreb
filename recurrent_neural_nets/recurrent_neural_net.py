@@ -1,11 +1,12 @@
 import numpy as np
 import dataset
-import time
 
 
 class RNN(object):
 
-    def __init__(self, hidden_size, sequence_length, vocab_size, learning_rate, batch_size):
+    def __init__(self, hidden_size, sequence_length, vocab_size, learning_rate, batch_size,
+                 non_linearity_function=np.tanh):
+
         self.hidden_size = hidden_size
         self.sequence_length = sequence_length
         self.vocab_size = vocab_size
@@ -24,6 +25,7 @@ class RNN(object):
         self.memory_V = np.zeros_like(self.V)
 
         self.memory_b, self.memory_c = np.zeros_like(self.b), np.zeros_like(self.c)
+        self.non_linearity_function = non_linearity_function
 
         self.grad_clip = 5
 
@@ -49,11 +51,11 @@ class RNN(object):
         # W - hidden to hidden projection matrix (hidden size x hidden size)
         # b - bias of shape (hidden size x 1)
 
-        cache = (x, h_prev)
+        h_current = self.non_linearity_function(
+            np.dot(x, U) + np.dot(h_prev, W) + b.T
+        )
 
-        h_temp = np.tanh(np.dot(x, U) + np.dot(h_prev, W))
-        h_current = np.add(h_temp, b.T)
-
+        cache = (x, h_current, h_prev)
 
         # return the new hidden state and a tuple of values needed for the backward step
         return h_current, cache
@@ -71,7 +73,8 @@ class RNN(object):
         cache = []
         h = []
         h_previous = h0
-        for time_step in range(self.sequence_length):
+        seq_len = x.shape[1]
+        for time_step in range(seq_len):
             h_current, cache_current = self.__rnn_step_forward(x[:, time_step], h_previous, U, W, b)
             h_previous = h_current
 
@@ -88,7 +91,7 @@ class RNN(object):
         # grad_next - upstream gradient of the loss with respect to the next hidden state and current output
         # cache - cached information from the forward pass
 
-        x, h_prev = cache
+        x, h_current, h_prev = cache
 
         dW = np.dot(grad_next.T, h_prev)
         dU = np.dot(grad_next.T, x).T
@@ -109,9 +112,15 @@ class RNN(object):
         dU = 0
         dW = 0
         db = 0
-        for cache_step in reversed(cache):
-            grad_next = dh * (1 - cache_step[1]**2)
+        for cache_step, dh_step in zip(reversed(cache), dh):
+            x, h_current, h_prev = cache_step
+
+            grad_next = dh_step * (1 - h_current**2)
             dh_prev_step, dU_step, dW_step, db_step = self.__rnn_step_backward(grad_next, cache_step)
+
+            dU_step = np.clip(dU_step, -self.grad_clip, self.grad_clip)
+            dW_step = np.clip(dW_step, -self.grad_clip, self.grad_clip)
+            db_step = np.clip(db_step, -self.grad_clip, self.grad_clip)
 
             dU += dU_step
             dW += dW_step
@@ -120,16 +129,13 @@ class RNN(object):
         # compute and return gradients with respect to each parameter
         # for the whole time series.
         # Why are we not computing the gradient with respect to inputs (x)?
-        dU = np.clip(dU, -self.grad_clip, self.grad_clip)
-        dW = np.clip(dW, -self.grad_clip, self.grad_clip)
-        db = np.clip(db, -self.grad_clip, self.grad_clip)
 
         return dU, dW, db
 
     @staticmethod
     def __output(h, V, c):
         # Calculate the output probabilities of the network
-        return np.add(np.dot(h, V), c.T)
+        return np.dot(h, V) + c.T
 
     def __output_loss_and_grads(self, h, V, c, y):
         # Calculate the loss of the network for each of the outputs
@@ -159,31 +165,45 @@ class RNN(object):
         # calculate the gradients with respect to the hidden layer h
 
         loss = 0
-        dh = 0
         dV = 0
         dc = 0
-        for time_step, h_current in enumerate(h):
-            output = self.__output(h_current, V, c)
-            y_pred = self.softmax(output)
+        dh_previous = 0
+        dh = []
+        for time_step, h_current in enumerate(reversed(h)):
+            y_pred = self.softmax(self.__output(h_current, V, c))
 
-            y_true = y[:, time_step, :]
-
+            current_step = len(h) - time_step - 1
+            y_true = y[:, current_step, :]
             y_grad = y_pred - y_true
-            loss -= np.sum(y_true * np.log(y_pred))
+
+            N = h_current.shape[0]
+            loss -= np.average(np.log(y_pred[range(N), np.where(y_true == 1)[1]]))
 
             dc += y_grad.T
             dV += np.dot(h_current.T, y_grad)
 
-            # TODO FIX dh
-            dh += np.dot(V, y_pred.T).T
-            #dh += y_true
+            dh_current = np.dot(V, y_grad.T) + dh_previous
+            dh_previous = dh_current
 
+            dh_current = np.clip(dh_current, -self.grad_clip, self.grad_clip)
+            dh.append(dh_current.T)
+
+        dc = np.clip(dc, -self.grad_clip, self.grad_clip)
+        dV = np.clip(dV, -self.grad_clip, self.grad_clip)
+
+        # dh is a list of hidden state gradients in reverse order dh[0] is the gradient of the last time step
         return loss, dh, dV, dc
 
     @staticmethod
     def softmax(x):
-        e_x = np.exp(x - np.max(x))
-        return (e_x + 1) / (e_x.sum(axis=0) + 2)
+        exp_x = np.exp(x - np.max(x, axis=1, keepdims=True))
+        y_pred = exp_x / np.sum(exp_x, axis=1, keepdims=True)
+
+        # Check the softmax gives probabilities
+        for time_step in range(x.shape[0]):
+            assert abs(1 - sum(y_pred[time_step, :])) < 1e-6
+
+        return y_pred
 
     def one_hot(self, vector):
         """
@@ -221,7 +241,6 @@ class RNN(object):
     def __update(self, dU, dW, db, dV, dc):
 
         # update memory matrices
-        # perform the Adagrad update of parameters
         self.U -= self.learning_rate * dU
         self.W -= self.learning_rate * dW
         self.b -= self.learning_rate * db
@@ -231,20 +250,25 @@ class RNN(object):
     def sample(self, parser, seed, n_sample):
         h0 = np.zeros((1, self.hidden_size))
 
-        seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
-        seed_oh = np.array(map(self.one_hot, seed_as_id))
+        outs = []
+        for i in range(n_sample):
+            sample = []
 
-        h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
+            seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
+            seed_oh = np.array(map(self.one_hot, seed_as_id))
 
-        sample = []
-        for h_current in h:
-            logits = self.__output(h_current, self.V, self.c)
-            out = self.softmax(logits)
-            out = out[0, :]
-            char = parser.decode(np.argmax(out))
-            sample.append(char)
+            h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
 
-        return ''.join(sample)
+            for h_current in h:
+                logits = self.__output(h_current, self.V, self.c)
+                out = self.softmax(logits)
+                out = out[0, :]
+                char = parser.decode(np.argmax(out))
+                sample.append(char)
+
+            seed = ''.join(sample)
+            outs.append(seed)
+        return ''.join(seed)
 
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
@@ -259,7 +283,9 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
         sequence_length=sequence_length,
         vocab_size=vocab_size,
         learning_rate=learning_rate,
-        batch_size=batch_size)
+        batch_size=batch_size,
+        non_linearity_function=np.tanh
+    )
 
     current_epoch = 0
     batch = 0
@@ -289,15 +315,22 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
             losses.append(loss)
 
             if batch % sample_every == 0:
-                sample = rnn.sample(parser, seed="HAN:\nIs that good or bad?\n\n   ", n_sample=300)
-                print sample
+                sample = rnn.sample(parser, seed="HAN:\nIs that good or bad?\n\n", n_sample=1)
+                print 'RNN:', sample
             batch += 1
 
         print 'Epoch: {0}, loss: {1}'.format(current_epoch, np.average(losses))
 
 
 def main():
-    run_language_model(max_epochs=30, learning_rate=1e-1, hidden_size=200, sequence_length=30, batch_size=1)
+    run_language_model(
+        max_epochs=10000,
+        learning_rate=1e-3,
+        hidden_size=100,
+        sequence_length=30,
+        batch_size=128,
+        sample_every=100
+    )
 
 if __name__ == '__main__':
     main()
