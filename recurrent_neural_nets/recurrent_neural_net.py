@@ -33,6 +33,18 @@ class RNN(object):
         for param_name, param in {'U': self.U, 'W': self.W, 'b': self.b, 'V': self.V, 'c': self.c}.iteritems():
             print param_name, ' ->', param.shape
 
+    def __gradient_descent(self, param, gradient, learning_rate):
+        return param - (gradient * learning_rate)
+
+    def __adagrad(self, memories):
+        raise NotImplementedError
+
+    def __rmsprop(self):
+        raise NotImplementedError
+
+    def __adam(self):
+        raise NotImplementedError
+
     def step(self, h0, x_oh, y_oh):
         h, cache = self.__rnn_forward(x_oh, h0, self.U, self.W, self.b)
         loss, dh, dV, dc = self.__output_loss_and_grads(h, self.V, self.c, y_oh)
@@ -240,12 +252,17 @@ class RNN(object):
 
     def __update(self, dU, dW, db, dV, dc):
 
-        # update memory matrices
-        self.U -= self.learning_rate * dU
-        self.W -= self.learning_rate * dW
-        self.b -= self.learning_rate * db
-        self.V -= self.learning_rate * dV
-        self.c -= self.learning_rate * dc
+        self.U = self.__gradient_descent(self.U, dU, self.learning_rate)
+        self.W = self.__gradient_descent(self.W, dW, self.learning_rate)
+        self.b = self.__gradient_descent(self.b, db, self.learning_rate)
+        self.V = self.__gradient_descent(self.V, dV, self.learning_rate)
+        self.c = self.__gradient_descent(self.c, dc, self.learning_rate)
+
+        #self.U -= self.learning_rate * dU
+        # self.W -= self.learning_rate * dW
+        # self.b -= self.learning_rate * db
+        # self.V -= self.learning_rate * dV
+        # self.c -= self.learning_rate * dc
 
     def sample(self, parser, seed, n_sample):
         h0 = np.zeros((1, self.hidden_size))
@@ -260,15 +277,14 @@ class RNN(object):
             h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
 
             for h_current in h:
-                logits = self.__output(h_current, self.V, self.c)
-                out = self.softmax(logits)
+                out = self.softmax(self.__output(h_current, self.V, self.c))
                 out = out[0, :]
                 char = parser.decode(np.argmax(out))
                 sample.append(char)
 
             seed = ''.join(sample)
             outs.append(seed)
-        return ''.join(seed)
+        return ''.join(outs)
 
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
@@ -328,7 +344,7 @@ def main():
         learning_rate=1e-3,
         hidden_size=100,
         sequence_length=30,
-        batch_size=128,
+        batch_size=16,
         sample_every=100
     )
 
