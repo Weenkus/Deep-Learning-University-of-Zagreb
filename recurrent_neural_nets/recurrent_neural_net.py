@@ -22,12 +22,12 @@ class RNN(object):
         self.vocab_size = vocab_size
         self.learning_rate = learning_rate
 
-        self.U = np.array(init_factor * np.random.randn(vocab_size, hidden_size))
-        self.W = np.array(init_factor * np.random.randn(hidden_size, hidden_size))
-        self.b = np.ones((hidden_size, batch_size))
+        self.U = init_factor * np.random.randn(vocab_size, hidden_size)
+        self.W = init_factor * np.random.randn(hidden_size, hidden_size)
+        self.b = np.zeros((hidden_size, batch_size))
 
-        self.V = np.array(init_factor * np.random.randn(hidden_size, vocab_size))
-        self.c = np.ones((vocab_size, batch_size))
+        self.V = init_factor * np.random.randn(hidden_size, vocab_size)
+        self.c = np.zeros((vocab_size, batch_size))
 
         # memory of past gradients - rolling sum of squares for Adagrad
         self.memory_U = np.zeros_like(self.U)
@@ -37,7 +37,7 @@ class RNN(object):
         self.memory_b, self.memory_c = np.zeros_like(self.b), np.zeros_like(self.c)
         self.non_linearity_function = non_linearity_function
 
-        self.grad_clip = 5
+        self.grad_clip = 2
 
         print 'RNN created'
         for param_name, param in {'U': self.U, 'W': self.W, 'b': self.b, 'V': self.V, 'c': self.c}.iteritems():
@@ -391,7 +391,7 @@ def main():
         sample_every=100,
         decay_rate=0.9,
         optimizer='AdaGrad',
-        init_factor=0.02
+        init_factor=0.01
     )
 
 if __name__ == '__main__':
