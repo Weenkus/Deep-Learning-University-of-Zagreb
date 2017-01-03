@@ -4,8 +4,8 @@ import dataset
 
 class RNN(object):
 
-    def __init__(self, hidden_size, sequence_length, vocab_size, learning_rate, batch_size,
-                 non_linearity_function=np.tanh, decay_rate=None, optimizier=None, init_factor=0.01):
+    def __init__(self, hidden_size, sequence_length, vocab_size, learning_rate, decay_rate=None,
+                 optimizier=None, init_factor=0.01, grad_clip=5):
 
         self.optimizer = optimizier
         self.optimizers = {
@@ -15,7 +15,6 @@ class RNN(object):
             'RMSProp': self.__rmsprop
         }
 
-        self.batch_size = batch_size
         self.decay_rate = decay_rate
         self.hidden_size = hidden_size
         self.sequence_length = sequence_length
@@ -24,10 +23,10 @@ class RNN(object):
 
         self.U = init_factor * np.random.randn(vocab_size, hidden_size)
         self.W = init_factor * np.random.randn(hidden_size, hidden_size)
-        self.b = np.zeros((hidden_size, batch_size))
+        self.b = np.zeros((hidden_size, 1))
 
         self.V = init_factor * np.random.randn(hidden_size, vocab_size)
-        self.c = np.zeros((vocab_size, batch_size))
+        self.c = np.zeros((vocab_size, 1))
 
         # memory of past gradients - rolling sum of squares for Adagrad
         self.memory_U = np.zeros_like(self.U)
@@ -35,9 +34,8 @@ class RNN(object):
         self.memory_V = np.zeros_like(self.V)
 
         self.memory_b, self.memory_c = np.zeros_like(self.b), np.zeros_like(self.c)
-        self.non_linearity_function = non_linearity_function
 
-        self.grad_clip = 2
+        self.grad_clip = grad_clip
 
         print 'RNN created'
         for param_name, param in {'U': self.U, 'W': self.W, 'b': self.b, 'V': self.V, 'c': self.c}.iteritems():
@@ -108,10 +106,7 @@ class RNN(object):
         # U - input projection matrix (input dimension x hidden size)
         # W - hidden to hidden projection matrix (hidden size x hidden size)
         # b - bias of shape (hidden size x 1)
-
-        h_current = self.non_linearity_function(
-            np.dot(x, U) + np.dot(h_prev, W) + b.T
-        )
+        h_current = np.tanh(np.dot(x, U) + np.dot(h_prev.T, W) + b.T).T
 
         cache = (x, h_current, h_prev)
 
@@ -150,11 +145,10 @@ class RNN(object):
         # cache - cached information from the forward pass
 
         x, h_current, h_prev = cache
-
-        dW = np.dot(grad_next.T, h_prev)
-        dU = np.dot(grad_next.T, x).T
-        db = grad_next.T
-        dh_prev = np.dot(grad_next, self.W)
+        dW = np.dot(grad_next, h_prev.T)
+        dU = np.dot(grad_next, x).T
+        db = grad_next
+        dh_prev = np.dot(grad_next.T, self.W)
 
         # compute and return gradients with respect to each parameter
         # HINT: you can use the chain rule to compute the derivative of the
@@ -173,7 +167,7 @@ class RNN(object):
         for cache_step, dh_step in zip(reversed(cache), dh):
             x, h_current, h_prev = cache_step
 
-            grad_next = dh_step * (1 - h_current**2)
+            grad_next = dh_step.T * (1 - h_current**2)
             dh_prev_step, dU_step, dW_step, db_step = self.__rnn_step_backward(grad_next, cache_step)
 
             dU_step = np.clip(dU_step, -self.grad_clip, self.grad_clip)
@@ -193,7 +187,7 @@ class RNN(object):
     @staticmethod
     def __output(h, V, c):
         # Calculate the output probabilities of the network
-        return np.dot(h, V) + c.T
+        return np.dot(h.T, V) + c.T
 
     def __output_loss_and_grads(self, h, V, c, y):
         # Calculate the loss of the network for each of the outputs
@@ -235,10 +229,12 @@ class RNN(object):
             y_grad = y_pred - y_true
 
             N = h_current.shape[0]
-            loss -= np.average(np.log(y_pred[range(N), np.where(y_true == 1)[1]]))
+
+            prob = y_pred[0][np.where(y_true[0] == 1)][0]
+            loss -= np.average(np.log(prob))
 
             dc += y_grad.T
-            dV += np.dot(h_current.T, y_grad)
+            dV += np.dot(h_current, y_grad)
 
             dh_current = np.dot(V, y_grad.T) + dh_previous
             dh_previous = dh_current
@@ -301,35 +297,40 @@ class RNN(object):
         return result.astype(int)
 
     def __update(self, dU, dW, db, dV, dc):
+        db = np.array([np.average(db, axis=1)]).T
+        dc = np.array([np.average(dc, axis=1)]).T
+
         self.optimizers[self.optimizer](dU, dW, dV, db, dc)
 
     def sample(self, parser, seed, n_sample):
-        h0 = np.zeros((1, self.hidden_size))
+        h0 = np.zeros((self.hidden_size, 1))
 
-        outs = []
+        seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
+        seed_as_id = np.array([map(lambda x: x if x is not None else 0, seed_as_id[0])])
+        input = np.array(map(self.one_hot, seed_as_id))
+        h, cache = self.__rnn_forward(input, h0, self.U, self.W, self.b)
+        h_prev = h[-1]
+
+        out = self.softmax(self.__output(h_prev, self.V, self.c))
+        char = parser.decode(np.argmax(out[0, :]))
+
+        output = []
         for i in range(n_sample):
-            sample = []
+            char_as_id = np.array([parser.encode(char)])
+            char_one_hot = self.one_hot(char_as_id)
+            h_current, cache = self.__rnn_step_forward(char_one_hot, h_prev, self.U, self.W, self.b)
 
-            seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
-            seed_as_id = np.array([map(lambda x: x if x is not None else 0, seed_as_id[0])])
-            seed_oh = np.array(map(self.one_hot, seed_as_id))
+            out = self.softmax(self.__output(h_current, self.V, self.c))
+            char = parser.decode(np.argmax(out[0]))
+            output.append(char)
 
-            h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
-            h0 = h[-1]
+            h_prev = h_current
 
-            for h_current in h:
-                out = self.softmax(self.__output(h_current, self.V, self.c))
-                char = parser.decode(np.argmax(out[0, :]))
-                sample.append(char)
-
-            seed = sample[-1]
-            outs.append(''.join(sample) if i == 0 else seed)
-
-        return ''.join(outs)
+        return ''.join(output)
 
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
-                       batch_size=16, decay_rate=0.9, optimizer='GradientDescent', init_factor=0.01):
+                       batch_size=16, decay_rate=0.9, optimizer='GradientDescent', init_factor=0.01, grad_clip=5):
     parser = dataset.Parser('data/selected_conversations.txt')
     parser.preprocess()
     parser.create_minibatches(batch_size=batch_size, sequence_length=sequence_length)
@@ -340,23 +341,23 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
         sequence_length=sequence_length,
         vocab_size=vocab_size,
         learning_rate=learning_rate,
-        batch_size=batch_size,
-        non_linearity_function=np.tanh,
         decay_rate=decay_rate,
-        optimizier=optimizer
+        optimizier=optimizer,
+        init_factor=init_factor,
+        grad_clip=grad_clip
     )
 
     current_epoch = 0
     batch = 0
 
-    h0 = np.zeros((batch_size, hidden_size))
+    h0 = np.zeros((hidden_size, batch_size))
 
     while current_epoch < max_epochs:
         losses = []
         for e, x, y in parser.minibatch_generator():
             if e == 0:
                 current_epoch += 1
-                h0 = np.zeros((batch_size, hidden_size))
+                h0 = np.zeros((hidden_size, batch_size))
                 # why do we reset the hidden state here?
 
             # One-hot transform the x and y batches
@@ -383,15 +384,16 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
 
 def main():
     run_language_model(
-        max_epochs=1000099,
-        learning_rate=5e-2,
-        hidden_size=100,
+        max_epochs=10000,
+        learning_rate=1e-1,
+        hidden_size=200,
         sequence_length=30,
-        batch_size=32,
-        sample_every=100,
+        batch_size=1,
+        sample_every=300,
         decay_rate=0.9,
         optimizer='AdaGrad',
-        init_factor=0.01
+        init_factor=0.01,
+        grad_clip=3
     )
 
 if __name__ == '__main__':

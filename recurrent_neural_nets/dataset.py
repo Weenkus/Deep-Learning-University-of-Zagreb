@@ -17,6 +17,7 @@ class Parser(object):
         self.id2char = None
         self.x = None
         self.num_batches = None
+        self.current_batch = 0
 
     def preprocess(self):
         with open(self.file_path, "r") as input_file:
@@ -67,6 +68,28 @@ class Parser(object):
         for epoch, batch in enumerate(self.batches):
             batch_x, batch_y = batch
             yield epoch, batch_x, batch_y
+
+    def sequences_generator(self, sequence_length):
+        for i in range(len(self.x) / sequence_length):
+            x = self.x[i * sequence_length:(i + 1) * sequence_length]
+            y = self.x[i * sequence_length + 1:(i + 1) * sequence_length + 1]
+
+            yield i, x, y
+
+    def get_batch(self):
+        batch_x, batch_y = self.batches[self.current_batch]
+        self.current_batch = (self.current_batch + 1) % len(self.batches)
+
+        return batch_x, batch_y
+
+    def get_sequence(self):
+        batch_x, batch_y = self.batches[self.current_batch]
+        self.current_batch = (self.current_batch + 1) % len(self.batches)
+
+        return batch_x[0], batch_y[0]
+
+    def get_vocabulary_size(self):
+        return len(self.sorted_chars)
 
 
 def main():
