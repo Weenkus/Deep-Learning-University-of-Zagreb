@@ -5,18 +5,28 @@ import dataset
 class RNN(object):
 
     def __init__(self, hidden_size, sequence_length, vocab_size, learning_rate, batch_size,
-                 non_linearity_function=np.tanh):
+                 non_linearity_function=np.tanh, decay_rate=None, optimizier=None, init_factor=0.01):
 
+        self.optimizer = optimizier
+        self.optimizers = {
+            'Adam': self.__adam,
+            'AdaGrad': self.__adagrad,
+            'GradientDescent': self.__gradient_descent,
+            'RMSProp': self.__rmsprop
+        }
+
+        self.batch_size = batch_size
+        self.decay_rate = decay_rate
         self.hidden_size = hidden_size
         self.sequence_length = sequence_length
         self.vocab_size = vocab_size
         self.learning_rate = learning_rate
 
-        self.U = np.array(np.random.randn(vocab_size, hidden_size))
-        self.W = np.array(np.random.randn(hidden_size, hidden_size))
+        self.U = np.array(init_factor * np.random.randn(vocab_size, hidden_size))
+        self.W = np.array(init_factor * np.random.randn(hidden_size, hidden_size))
         self.b = np.ones((hidden_size, batch_size))
 
-        self.V = np.array(np.random.randn(hidden_size, vocab_size))
+        self.V = np.array(init_factor * np.random.randn(hidden_size, vocab_size))
         self.c = np.ones((vocab_size, batch_size))
 
         # memory of past gradients - rolling sum of squares for Adagrad
@@ -33,14 +43,50 @@ class RNN(object):
         for param_name, param in {'U': self.U, 'W': self.W, 'b': self.b, 'V': self.V, 'c': self.c}.iteritems():
             print param_name, ' ->', param.shape
 
-    def __gradient_descent(self, param, gradient, learning_rate):
-        return param - (gradient * learning_rate)
+    def __gradient_descent(self, dU, dW, dV, db, dc):
+        self.U -= self.learning_rate * dU
+        self.W -= self.learning_rate * dW
+        self.b -= self.learning_rate * db
+        self.V -= self.learning_rate * dV
+        self.c -= self.learning_rate * dc
 
-    def __adagrad(self, memories):
-        raise NotImplementedError
+    def __adagrad(self, dU, dW, dV, db, dc):
+        self.memory_U += np.multiply(dU, dU)
+        self.memory_W += np.multiply(dW, dW)
+        self.memory_V += np.multiply(dV, dV)
+        self.memory_b += np.multiply(db, db)
+        self.memory_c += np.multiply(dc, dc)
 
-    def __rmsprop(self):
-        raise NotImplementedError
+        update_U = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_U)), dU)
+        update_W = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_W)), dW)
+        update_V = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_V)), dV)
+        update_b = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_b)), db)
+        update_c = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_c)), dc)
+
+        self.U += update_U
+        self.W += update_W
+        self.V += update_V
+        self.b += update_b
+        self.c += update_c
+
+    def __rmsprop(self, dU, dW, dV, db, dc):
+        self.memory_U = (self.decay_rate * self.memory_U) + ((1 - self.decay_rate) * np.multiply(dU, dU))
+        self.memory_W = (self.decay_rate * self.memory_W) + ((1 - self.decay_rate) * np.multiply(dW, dW))
+        self.memory_V = (self.decay_rate * self.memory_V) + ((1 - self.decay_rate) * np.multiply(dV, dV))
+        self.memory_b = (self.decay_rate * self.memory_b) + ((1 - self.decay_rate) * np.multiply(db, db))
+        self.memory_c = (self.decay_rate * self.memory_c) + ((1 - self.decay_rate) * np.multiply(dc, dc))
+
+        update_U = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_U)), dU)
+        update_W = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_W)), dW)
+        update_V = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_V)), dV)
+        update_b = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_b)), db)
+        update_c = np.multiply(-self.learning_rate / (1e-7 + np.sqrt(self.memory_c)), dc)
+
+        self.U += update_U
+        self.W += update_W
+        self.V += update_V
+        self.b += update_b
+        self.c += update_c
 
     def __adam(self):
         raise NotImplementedError
@@ -197,6 +243,10 @@ class RNN(object):
             dh_current = np.dot(V, y_grad.T) + dh_previous
             dh_previous = dh_current
 
+            # dV = np.divide(dV, self.batch_size)
+            # dc = np.divide(dc, self.batch_size)
+            # dh_current = np.divide(dh_current, self.batch_size)
+
             dh_current = np.clip(dh_current, -self.grad_clip, self.grad_clip)
             dh.append(dh_current.T)
 
@@ -251,18 +301,7 @@ class RNN(object):
         return result.astype(int)
 
     def __update(self, dU, dW, db, dV, dc):
-
-        self.U = self.__gradient_descent(self.U, dU, self.learning_rate)
-        self.W = self.__gradient_descent(self.W, dW, self.learning_rate)
-        self.b = self.__gradient_descent(self.b, db, self.learning_rate)
-        self.V = self.__gradient_descent(self.V, dV, self.learning_rate)
-        self.c = self.__gradient_descent(self.c, dc, self.learning_rate)
-
-        #self.U -= self.learning_rate * dU
-        # self.W -= self.learning_rate * dW
-        # self.b -= self.learning_rate * db
-        # self.V -= self.learning_rate * dV
-        # self.c -= self.learning_rate * dc
+        self.optimizers[self.optimizer](dU, dW, dV, db, dc)
 
     def sample(self, parser, seed, n_sample):
         h0 = np.zeros((1, self.hidden_size))
@@ -275,20 +314,21 @@ class RNN(object):
             seed_oh = np.array(map(self.one_hot, seed_as_id))
 
             h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)
+            h0 = h[-1]
 
             for h_current in h:
                 out = self.softmax(self.__output(h_current, self.V, self.c))
-                out = out[0, :]
-                char = parser.decode(np.argmax(out))
+                char = parser.decode(np.argmax(out[0, :]))
                 sample.append(char)
 
-            seed = ''.join(sample)
-            outs.append(seed)
+            seed = sample[-1]
+            outs.append(''.join(sample) if i == 0 else seed)
+
         return ''.join(outs)
 
 
 def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning_rate=1e-1, sample_every=100,
-                       batch_size=16):
+                       batch_size=16, decay_rate=0.9, optimizer='GradientDescent', init_factor=0.01):
     parser = dataset.Parser('data/selected_conversations.txt')
     parser.preprocess()
     parser.create_minibatches(batch_size=batch_size, sequence_length=sequence_length)
@@ -300,7 +340,9 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
         vocab_size=vocab_size,
         learning_rate=learning_rate,
         batch_size=batch_size,
-        non_linearity_function=np.tanh
+        non_linearity_function=np.tanh,
+        decay_rate=decay_rate,
+        optimizier=optimizer
     )
 
     current_epoch = 0
@@ -331,7 +373,7 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
             losses.append(loss)
 
             if batch % sample_every == 0:
-                sample = rnn.sample(parser, seed="HAN:\nIs that good or bad?\n\n", n_sample=1)
+                sample = rnn.sample(parser, seed="HAN:\nIs that good or bad?\n\n", n_sample=100)
                 print 'RNN:', sample
             batch += 1
 
@@ -340,12 +382,15 @@ def run_language_model(max_epochs, hidden_size=100, sequence_length=30, learning
 
 def main():
     run_language_model(
-        max_epochs=10000,
-        learning_rate=1e-3,
+        max_epochs=1000099,
+        learning_rate=5e-2,
         hidden_size=100,
         sequence_length=30,
-        batch_size=16,
-        sample_every=100
+        batch_size=32,
+        sample_every=100,
+        decay_rate=0.9,
+        optimizer='AdaGrad',
+        init_factor=0.02
     )
 
 if __name__ == '__main__':
