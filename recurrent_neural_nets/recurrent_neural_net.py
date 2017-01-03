@@ -311,6 +311,7 @@ class RNN(object):
             sample = []
 
             seed_as_id = np.array([parser.encode(seed)]).reshape((1, len(seed)))
+            seed_as_id = np.array([map(lambda x: x if x is not None else 0, seed_as_id[0])])
             seed_oh = np.array(map(self.one_hot, seed_as_id))
 
             h, cache = self.__rnn_forward(seed_oh, h0, self.U, self.W, self.b)

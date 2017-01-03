@@ -57,6 +57,9 @@ class Parser(object):
             X = np.array(self.x[batch_start_index:batch_end_index])
             y = np.array(self.x[batch_start_index+1:batch_end_index+1])
 
+            X = map(lambda x: x if x is not None else 0, X)
+            y = map(lambda x: x if x is not None else 0, y)
+
             data_shape = (batch_size, sequence_length)
             self.batches.append((np.reshape(X, data_shape), np.reshape(y, data_shape)))
 
