@@ -152,7 +152,6 @@ class RNN(object):
 
             x_one_hot = np.zeros((self.vocab_size, 1))
             x_one_hot[char_id] = 1
-            char_ids.append(char_id)
 
         for t in range(n_sample):
             h = self.__hidden_output(x_one_hot, h)
