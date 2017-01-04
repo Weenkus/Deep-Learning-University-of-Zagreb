@@ -7,6 +7,7 @@ class RNN(object):
     def __init__(self, vocab_size, hidden_size=100, learning_rate=1e-1, init_factor=0.01,
                  gradient_clip_size=5, optimizer='AdaGrad', decay_rate=0.9):
 
+        self.decay_rate = decay_rate
         self.optimizer = optimizer
         self.gradient_clip_size = gradient_clip_size
         self.vocab_size = vocab_size
@@ -33,13 +34,13 @@ class RNN(object):
         }
 
     def train(self, x, y):
-        xhat = {}
+        x_one_hot = {}
         probs = {}
         h = {}
         h[-1] = np.copy(self.h)
 
-        loss = self.__forward(x, y, xhat, h, probs)
-        dU, dW, dV, db, dc, dh_next = self.__backward(x, y, probs, h, xhat)
+        loss = self.__forward(x, y, x_one_hot, h, probs)
+        dU, dW, dV, db, dc, dh_next = self.__backward(x, y, probs, h, x_one_hot)
         self.__update_params(dU, dW, dV, db, dc)
 
         self.h = h[len(x)-1]
@@ -65,20 +66,27 @@ class RNN(object):
             param += -self.learning_rate * gradient / np.sqrt(gradient_memory + 1e-8)
 
     def __rmsprop(self, dU, dW, dV, db, dc):
-        raise NotImplementedError
+        for param, gradient, gradient_memory in zip(
+                [self.W, self.U, self.V, self.b, self.c],
+                [dW, dU, dV, db, dc],
+                [self.memory_W, self.memory_U, self.memory_V, self.memory_b, self.memory_c]
+        ):
+
+            gradient_memory += (self.decay_rate * gradient_memory) + ((1 - self.decay_rate) * (gradient * gradient))
+            param += -self.learning_rate * gradient / np.sqrt(gradient_memory + 1e-8)
 
     def __adam(self, dU, dW, dV, db, dc):
         raise NotImplementedError
 
-    def __forward(self, x, y, xhat, h, probs):
+    def __forward(self, x, y, x_one_hot, h, probs):
         loss = 0
         y_true = y
         for time_step in range(len(x)):
             h_prev = h[time_step-1]
-            xhat[time_step] = np.zeros((self.vocab_size, 1))
-            xhat[time_step][x[time_step]] = 1
+            x_one_hot[time_step] = np.zeros((self.vocab_size, 1))
+            x_one_hot[time_step][x[time_step]] = 1
 
-            h[time_step] = self.__hidden_output(xhat[time_step], h_prev)
+            h[time_step] = self.__hidden_output(x_one_hot[time_step], h_prev)
             out = self.__output(h[time_step])
             probs[time_step] = self.__softmax(out)
 
@@ -86,7 +94,7 @@ class RNN(object):
 
         return loss
 
-    def __backward(self, x, y, probs, h, xhat):
+    def __backward(self, x, y, probs, h, x_one_hot):
         dU = np.zeros_like(self.U)
         dW = np.zeros_like(self.W)
         dV = np.zeros_like(self.V)
@@ -95,25 +103,20 @@ class RNN(object):
         dh_next = np.zeros_like(self.h)
 
         for time_step in reversed(range(len(x))):
-            #backprop into y. see http://cs231n.github.io/neural-networks-case-study/#grad if confused here
-            dy = np.copy(probs[time_step])
-            dy[y[time_step]] -= 1
+            y_grad = np.copy(probs[time_step])
+            y_grad[y[time_step]] -= 1
 
-            #find updates for y
-            dV += np.dot(dy, h[time_step].T)
-            dc += dy
+            dV += np.dot(y_grad, h[time_step].T)
+            dc += y_grad
 
-            #backprop into h and through tanh nonlinearity
-            dh = np.dot(self.V.T, dy) + dh_next
-            dh_raw = (1 - h[time_step]**2) * dh
+            dh = np.dot(self.V.T, y_grad) + dh_next
+            upstream_gradient = (1 - h[time_step]**2) * dh
 
-            #find updates for h
-            dU += np.dot(dh_raw, xhat[time_step].T)
-            dW += np.dot(dh_raw, h[time_step-1].T)
-            db += dh_raw
+            dU += np.dot(upstream_gradient, x_one_hot[time_step].T)
+            dW += np.dot(upstream_gradient, h[time_step-1].T)
+            db += upstream_gradient
 
-            #save dh_next for subsequent iteration
-            dh_next = np.dot(self.W.T, dh_raw)
+            dh_next = np.dot(self.W.T, upstream_gradient)
 
         return dU, dW, dV, db, dc, dh_next
 
@@ -133,25 +136,35 @@ class RNN(object):
     def __loss(self, prob, y_true):
         return -np.log(prob[y_true, 0])
 
-    def sample(self, seed, n):
-        ndxs = []
+    def sample(self, parser, seed, n_sample):
+        char_ids = []
         h = self.h
 
-        xhat = np.zeros((self.vocab_size, 1))
-        xhat[seed] = 1#transform to 1-of-k
+        for char in seed:
+            char_id = parser.encode(char)
+            x_one_hot = np.zeros((self.vocab_size, 1))
+            x_one_hot[char_id] = 1
 
-        for t in range(n):
-            h = np.tanh(np.dot(self.U, xhat) + np.dot(self.W, h) + self.b)#update the state
-            y = np.dot(self.V, h) + self.c
-            p = np.exp(y) / np.sum(np.exp(y))
-            ndx = np.random.choice(range(self.vocab_size), p=p.ravel())
+            h = self.__hidden_output(x_one_hot, h)
+            y = self.__output(h)
+            probs = self.__softmax(y)
+            char_id = np.random.choice(range(self.vocab_size), p=probs.ravel())
 
-            xhat = np.zeros((self.vocab_size, 1))
-            xhat[ndx] = 1
+            x_one_hot = np.zeros((self.vocab_size, 1))
+            x_one_hot[char_id] = 1
+            char_ids.append(char_id)
 
-            ndxs.append(ndx)
+        for t in range(n_sample):
+            h = self.__hidden_output(x_one_hot, h)
+            y = self.__output(h)
+            probs = self.__softmax(y)
+            char_id = np.random.choice(range(self.vocab_size), p=probs.ravel())
 
-        return ndxs
+            x_one_hot = np.zeros((self.vocab_size, 1))
+            x_one_hot[char_id] = 1
+            char_ids.append(char_id)
+
+        return char_ids
 
 
 def language_model(vocab_size, parser, hidden_size, learning_rate, init_factor, epochs, gradient_clip_size,
@@ -164,8 +177,10 @@ def language_model(vocab_size, parser, hidden_size, learning_rate, init_factor, 
         for i, x, y in parser.sequences_generator(sequence_length=sequence_length):
 
             if i % 1000 == 0:
-                sample_ix = rnn.sample(x[0], 200)
-                txt = ''.join([parser.decode(n) for n in sample_ix])
+                #seed = "HAN:\nIs that good or bad?\n\n"
+                seed = 'H'
+                char_ids = rnn.sample(parser, seed=seed, n_sample=200)
+                txt = ''.join([parser.decode(n) for n in char_ids])
                 print txt
 
             loss = rnn.train(x, y)
@@ -186,8 +201,8 @@ if __name__ == "__main__":
         learning_rate=1e-1,
         init_factor=2e-2,
         epochs=16,
-        gradient_clip_size=5,
+        gradient_clip_size=4,
         optimizer='AdaGrad',
-        decay_rate=0.9,
+        decay_rate=0.2,
         sequence_length=30
     )
