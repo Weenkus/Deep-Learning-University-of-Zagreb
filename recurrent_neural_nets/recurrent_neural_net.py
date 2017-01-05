@@ -312,7 +312,8 @@ class RNN(object):
         h_prev = h[-1]
 
         out = self.softmax(self.__output(h_prev, self.V, self.c))
-        char = parser.decode(np.argmax(out[0, :]))
+        char_id = np.random.choice(range(self.vocab_size), p=out.ravel())
+        char = parser.decode(char_id)
 
         output = []
         for i in range(n_sample):
@@ -321,7 +322,8 @@ class RNN(object):
             h_current, cache = self.__rnn_step_forward(char_one_hot, h_prev, self.U, self.W, self.b)
 
             out = self.softmax(self.__output(h_current, self.V, self.c))
-            char = parser.decode(np.argmax(out[0]))
+            char_id = np.random.choice(range(self.vocab_size), p=out.ravel())
+            char = parser.decode(char_id)
             output.append(char)
 
             h_prev = h_current
@@ -386,14 +388,14 @@ def main():
     run_language_model(
         max_epochs=10000,
         learning_rate=1e-1,
-        hidden_size=200,
+        hidden_size=100,
         sequence_length=30,
-        batch_size=1,
+        batch_size=128,
         sample_every=300,
-        decay_rate=0.9,
+        decay_rate=0.95,
         optimizer='AdaGrad',
-        init_factor=0.01,
-        grad_clip=3
+        init_factor=0.02,
+        grad_clip=5
     )
 
 if __name__ == '__main__':

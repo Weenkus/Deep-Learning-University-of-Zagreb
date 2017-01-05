@@ -177,7 +177,7 @@ def language_model(vocab_size, parser, hidden_size, learning_rate, init_factor, 
 
             if i % 1000 == 0:
                 #seed = "HAN:\nIs that good or bad?\n\n"
-                seed = 'H'
+                seed = 'Rising up'
                 char_ids = rnn.sample(parser, seed=seed, n_sample=200)
                 txt = ''.join([parser.decode(n) for n in char_ids])
                 print txt
@@ -191,6 +191,8 @@ def language_model(vocab_size, parser, hidden_size, learning_rate, init_factor, 
 
 if __name__ == "__main__":
     parser = Parser('data/selected_conversations.txt')
+    #parser = Parser('data/hrvatski.txt')
+    #parser = Parser('data/eye_of_the_tigar.txt')
     parser.preprocess()
 
     language_model(
@@ -199,7 +201,7 @@ if __name__ == "__main__":
         hidden_size=100,
         learning_rate=1e-1,
         init_factor=2e-2,
-        epochs=16,
+        epochs=1600,
         gradient_clip_size=4,
         optimizer='AdaGrad',
         decay_rate=0.2,
