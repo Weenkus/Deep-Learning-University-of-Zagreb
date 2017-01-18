@@ -248,36 +248,26 @@ def main():
         # wake pass
         h1_up_prob = tf.nn.sigmoid(tf.matmul(X3, w1_up) + hb1_up)
         h1_up = sample_prob(h1_up_prob)  # s^{(n)} u pripremi
-        v1_up_down_prob = tf.nn.sigmoid(
-            tf.matmul(h1_up, w1_up, transpose_b=True) + vb1_down
-        )
+        v1_up_down_prob = tf.nn.sigmoid(tf.matmul(h1_up, w1_down) + vb1_down)
         v1_up_down = sample_prob(v1_up_down_prob)  # s^{(n-1)\mathit{novo}} u pripremi
 
 
         # top RBM Gibs passes
-        print v1_up_down.get_shape(), w2a.get_shape(), w1_up.get_shape()
-        h2_up_prob = tf.nn.sigmoid(
-            tf.matmul(v1_up_down, w1_up)
-        )
+        h2_up_prob = tf.nn.sigmoid(tf.matmul(h1_up, w2a) + hb2a)
         h2_up = sample_prob(h2_up_prob)
         h4 = h2_up
         for step in range(gibbs_sampling_steps):
-            h1_down_prob = tf.nn.sigmoid(tf.matmul(h2_up, w2a, transpose_b=True))
+            h1_down_prob = tf.nn.sigmoid(tf.matmul(h4, w2a, transpose_b=True))
             h1_down = sample_prob(h1_down_prob)
 
-            print v1_up_down.get_shape(), w2a.get_shape(), w1_down.get_shape()
-            h4_prob = tf.nn.sigmoid(tf.matmul(v1_up_down, w1_down, transpose_b=True))
+            h4_prob = tf.nn.sigmoid(tf.matmul(h1_down, w2a) + hb2a)
             h4 = sample_prob(h4_prob)
 
         # sleep pass
-        v1_down_prob = tf.nn.sigmoid(
-                tf.matmul(h4, w2a, transpose_b=True)
-            )
+        v1_down_prob = tf.nn.sigmoid(tf.matmul(h1_down, w1_down) + vb1_down)
         v1_down = sample_prob(v1_down_prob)  # s^{(n-1)} u pripremi
 
-        h1_down_up_prob = tf.nn.sigmoid(
-                tf.matmul(v1_down, w2a, transpose_b=True)
-            )
+        h1_down_up_prob = tf.nn.sigmoid(tf.matmul(v1_down, w1_up) + hb1_up)
         h1_down_up = sample_prob(h1_down_up_prob)  # s^{(n)\mathit{novo}} u pripremi
 
 
@@ -286,16 +276,10 @@ def main():
         update_vb1_down = tf.assign_add(vb1_down, beta * tf.reduce_mean(X3 - v1_up_down_prob, 0))
 
         # top RBM update (784, 100)
-        print 'GRAD_POST', h1_down.get_shape(), v1_up_down.get_shape(), v1_down.get_shape()
-        w2_positive_grad = tf.matmul(tf.transpose(h4), h2_up)
+        w2_positive_grad = tf.matmul(h1_up, h2_up, transpose_a=True)
+        w2_negative_grad = tf.matmul(h1_down, h4, transpose_a=True)
 
-        print 'GRAD_NEG', v1_up_down.get_shape(), h4.get_shape(), v1_down.get_shape()
-        w2_negative_grad = tf.matmul(tf.transpose(h4), v1_down)
-
-        print w2_negative_grad.get_shape(), w2_positive_grad.get_shape()
-
-        dw3 = (w2_positive_grad - w2_negative_grad) / tf.to_float(tf.shape(v1_down)[0])
-        print 'DW3', dw3.get_shape()
+        dw3 = w2_positive_grad-w2_negative_grad
 
         update_w2 = tf.assign_add(w2a, beta * dw3)
         update_hb1_down = tf.assign_add(hb1_down, beta * tf.reduce_mean(h1_up - h1_down, 0))
@@ -317,6 +301,7 @@ def main():
     n_samples = mnist.train.num_examples
 
     total_batch = int(n_samples / batch_size) * epochs
+    total_batch = 100
 
     with tf.Session(graph=g3) as sess:
         sess.run(initialize3)
@@ -339,7 +324,7 @@ def main():
     # vizualizacija rekonstrukcije i stanja
     Npics = 5
     plt.figure(figsize=(8, 12*4))
-    for i in range(20):
+    for i in range(2):
 
         plt.subplot(20, Npics, Npics*i + 1)
         plt.imshow(teX[i].reshape(v_shape), vmin=0, vmax=1)
@@ -362,6 +347,7 @@ def main():
         plt.title("Top states 3")
         plt.axis('off')
     plt.tight_layout()
+    plt.show()
 
 
 if __name__ == '__main__':
