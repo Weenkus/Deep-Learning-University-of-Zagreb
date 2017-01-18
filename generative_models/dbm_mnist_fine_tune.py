@@ -67,7 +67,7 @@ def draw_reconstructions(ins, outs, states, shape_in, shape_state):
                    interpolation="nearest")
         plt.title("States")
     plt.tight_layout()
-    plt.show()
+    #plt.show()
 
 
 def main():
@@ -154,6 +154,8 @@ def main():
     gibbs_sampling_steps = 2
     alpha = 0.1
 
+    print
+
     g2 = tf.Graph()
     with g2.as_default():
         X2 = tf.placeholder("float", [None, Nv])
@@ -181,8 +183,6 @@ def main():
         w2_positive_grad = tf.matmul(tf.transpose(v2), h2)
         w2_negative_grad = tf.matmul(tf.transpose(v3), h3)
 
-        print 'GRAD', w2_positive_grad.get_shape(), w2_negative_grad.get_shape()
-
         dw2 = (w2_positive_grad - w2_negative_grad) / tf.to_float(tf.shape(v2)[0])
 
         update_w2 = tf.assign_add(w2, alpha * dw2)
@@ -206,6 +206,7 @@ def main():
     n_samples = mnist.train.num_examples
 
     total_batch = int(n_samples / batch_size) * epochs
+    total_batch = 100
 
     with tf.Session(graph=g2) as sess:
         sess.run(initialize2)
@@ -225,6 +226,142 @@ def main():
 
     # vizualizacija rekonstrukcije i stanja
     draw_reconstructions(teX, vr2, h3s, v_shape, h2_shape)
+
+
+    # ************************** TASK 3 ****************
+
+    beta = 0.01
+
+    print
+
+    g3 = tf.Graph()
+    with g3.as_default():
+        X3 = tf.placeholder("float", [None, Nv])
+        w1_up = tf.Variable(w1s)
+        w1_down = tf.Variable(tf.transpose(w1s))
+        w2a = tf.Variable(w2s)
+        hb1_up = tf.Variable(hb1s)
+        hb1_down = tf.Variable(vb2s)
+        vb1_down = tf.Variable(vb1s)
+        hb2a = tf.Variable(hb2s)
+
+        # wake pass
+        h1_up_prob = tf.nn.sigmoid(tf.matmul(X3, w1_up) + hb1_up)
+        h1_up = sample_prob(h1_up_prob)  # s^{(n)} u pripremi
+        v1_up_down_prob = tf.nn.sigmoid(
+            tf.matmul(h1_up, w1_up, transpose_b=True) + vb1_down
+        )
+        v1_up_down = sample_prob(v1_up_down_prob)  # s^{(n-1)\mathit{novo}} u pripremi
+
+
+        # top RBM Gibs passes
+        print v1_up_down.get_shape(), w2a.get_shape(), w1_up.get_shape()
+        h2_up_prob = tf.nn.sigmoid(
+            tf.matmul(v1_up_down, w1_up)
+        )
+        h2_up = sample_prob(h2_up_prob)
+        h4 = h2_up
+        for step in range(gibbs_sampling_steps):
+            h1_down_prob = tf.nn.sigmoid(tf.matmul(h2_up, w2a, transpose_b=True))
+            h1_down = sample_prob(h1_down_prob)
+
+            print v1_up_down.get_shape(), w2a.get_shape(), w1_down.get_shape()
+            h4_prob = tf.nn.sigmoid(tf.matmul(v1_up_down, w1_down, transpose_b=True))
+            h4 = sample_prob(h4_prob)
+
+        # sleep pass
+        v1_down_prob = tf.nn.sigmoid(
+                tf.matmul(h4, w2a, transpose_b=True)
+            )
+        v1_down = sample_prob(v1_down_prob)  # s^{(n-1)} u pripremi
+
+        h1_down_up_prob = tf.nn.sigmoid(
+                tf.matmul(v1_down, w2a, transpose_b=True)
+            )
+        h1_down_up = sample_prob(h1_down_up_prob)  # s^{(n)\mathit{novo}} u pripremi
+
+
+        # generative weights update during wake pass
+        update_w1_down = tf.assign_add(w1_down, beta * tf.matmul(tf.transpose(h1_up), X3 - v1_up_down_prob) / tf.to_float(tf.shape(X3)[0]))
+        update_vb1_down = tf.assign_add(vb1_down, beta * tf.reduce_mean(X3 - v1_up_down_prob, 0))
+
+        # top RBM update (784, 100)
+        print 'GRAD_POST', h1_down.get_shape(), v1_up_down.get_shape(), v1_down.get_shape()
+        w2_positive_grad = tf.matmul(tf.transpose(h4), h2_up)
+
+        print 'GRAD_NEG', v1_up_down.get_shape(), h4.get_shape(), v1_down.get_shape()
+        w2_negative_grad = tf.matmul(tf.transpose(h4), v1_down)
+
+        print w2_negative_grad.get_shape(), w2_positive_grad.get_shape()
+
+        dw3 = (w2_positive_grad - w2_negative_grad) / tf.to_float(tf.shape(v1_down)[0])
+        print 'DW3', dw3.get_shape()
+
+        update_w2 = tf.assign_add(w2a, beta * dw3)
+        update_hb1_down = tf.assign_add(hb1_down, beta * tf.reduce_mean(h1_up - h1_down, 0))
+        update_hb2 = tf.assign_add(hb2a, beta * tf.reduce_mean(h2_up - h4, 0))
+
+        # recognition weights update during sleep pass
+        update_w1_up = tf.assign_add(w1_up, beta * tf.matmul(tf.transpose(v1_down_prob), h1_down - h1_down_up) / tf.to_float(tf.shape(X3)[0]))
+        update_hb1_up = tf.assign_add(hb1_up, beta * tf.reduce_mean(h1_down - h1_down_up, 0))###########^ #####
+
+        out3 = (update_w1_down, update_vb1_down, update_w2, update_hb1_down, update_hb2, update_w1_up, update_hb1_up)
+
+        err3 = X3 - v1_down_prob
+        err_sum3 = tf.reduce_mean(err3 * err3)
+
+        initialize3 = tf.initialize_all_variables()
+
+    batch_size = 100
+    epochs = 100
+    n_samples = mnist.train.num_examples
+
+    total_batch = int(n_samples / batch_size) * epochs
+
+    with tf.Session(graph=g3) as sess:
+        sess.run(initialize3)
+        for i in range(total_batch):
+            #
+            err, _ = sess.run([err_sum3, out3], feed_dict={X3: batch})
+
+            if i%(int(total_batch/10)) == 0:
+                print "Batch count: ", i, "  Avg. reconstruction error: ", err
+
+        w2ss, w1_ups, w1_downs, hb2ss, hb1_ups, hb1_downs, vb1_downs = sess.run(
+            [w2a, w1_up, w1_down, hb2a, hb1_up, hb1_down, vb1_down], feed_dict={X3: batch})
+        vr3, h4s, h4_probs = sess.run([v1_down_prob, h4, h4_prob], feed_dict={X3: teX[0:20,:]})
+
+    # vizualizacija tezina
+    draw_weights(w1_ups, v_shape, Nh)
+    draw_weights(w1_downs.T, v_shape, Nh)
+    draw_weights(w2ss, h1_shape, Nh2, interpolation="nearest")
+
+    # vizualizacija rekonstrukcije i stanja
+    Npics = 5
+    plt.figure(figsize=(8, 12*4))
+    for i in range(20):
+
+        plt.subplot(20, Npics, Npics*i + 1)
+        plt.imshow(teX[i].reshape(v_shape), vmin=0, vmax=1)
+        plt.title("Test input")
+        plt.axis('off')
+        plt.subplot(20, Npics, Npics*i + 2)
+        plt.imshow(vr[i][0:784].reshape(v_shape), vmin=0, vmax=1)
+        plt.title("Reconstruction 1")
+        plt.axis('off')
+        plt.subplot(20, Npics, Npics*i + 3)
+        plt.imshow(vr2[i][0:784].reshape(v_shape), vmin=0, vmax=1)
+        plt.title("Reconstruction 2")
+        plt.axis('off')
+        plt.subplot(20, Npics, Npics*i + 4)
+        plt.imshow(vr3[i][0:784].reshape(v_shape), vmin=0, vmax=1)
+        plt.title("Reconstruction 3")
+        plt.axis('off')
+        plt.subplot(20, Npics, Npics*i + 5)
+        plt.imshow(h4s[i][0:Nh2].reshape(h2_shape), vmin=0, vmax=1, interpolation="nearest")
+        plt.title("Top states 3")
+        plt.axis('off')
+    plt.tight_layout()
 
 
 if __name__ == '__main__':
