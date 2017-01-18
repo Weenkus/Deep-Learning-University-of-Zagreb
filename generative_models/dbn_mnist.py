@@ -54,7 +54,7 @@ def draw_reconstructions(ins, outs, states, shape_in, shape_state):
     shape_state -- dimezije za 2D prikaz stanja (npr. za 100 stanja (10,10)
     """
     plt.figure(figsize=(8, 12 * 4))
-    print ins.shape, outs.shape, states.shape
+    #print ins.shape, outs.shape, states.shape
     for i in range(2):
         plt.subplot(20, 4, 4 * i + 1)
         plt.imshow(ins[i].reshape(shape_in), vmin=0, vmax=1, interpolation="nearest")
@@ -67,7 +67,7 @@ def draw_reconstructions(ins, outs, states, shape_in, shape_state):
                    interpolation="nearest")
         plt.title("States")
     plt.tight_layout()
-    plt.show()
+    #plt.show()
 
 
 def main():
@@ -93,7 +93,7 @@ def main():
         for step in range(gibbs_sampling_steps):
             v1_prob = tf.nn.sigmoid(tf.matmul(h0, tf.transpose(w1)) + vb1)
             v1 = sample_prob(v1_prob)
-            h1_prob = tf.nn.sigmoid(tf.matmul(v1, w1) + hb1)
+            h1_prob = tf.matmul(v1, w1) + hb1
             h1 = sample_prob(h1_prob)
 
         # pozitivna faza
@@ -125,6 +125,7 @@ def main():
 
     total_batch = int(n_samples / batch_size) * epochs
     print 'Total batch: {0}'.format(total_batch)
+    total_batch = 100
 
     with tf.Session(graph=g1) as sess:
         sess.run(initialize1)
@@ -145,6 +146,83 @@ def main():
 
     # vizualizacija rekonstrukcije i stanja
     draw_reconstructions(teX, vr, h1s, v_shape, h1_shape)
+
+    ## **************** TASK 2 **************************
+    Nh2 = 100
+    h2_shape = (10, 10)
+
+    gibbs_sampling_steps = 2
+    alpha = 0.1
+
+    g2 = tf.Graph()
+    with g2.as_default():
+        X2 = tf.placeholder("float", [None, Nv])
+        w1a = tf.Variable(w1s)
+        vb1a = tf.Variable(vb1s)
+        hb1a = tf.Variable(hb1s)
+        w2 = weights([Nh, Nh2])
+        vb2 = bias([Nh])
+        hb2 = bias([Nh2])
+
+        # vidljivi sloj drugog RBM-a
+        v2_prob = tf.nn.sigmoid(tf.matmul(X2, w1a) + hb1a)
+        v2 = sample_prob(v2_prob)
+        # skriveni sloj drugog RBM-a
+        h2_prob = tf.nn.sigmoid(tf.matmul(v2, w2, transpose_b=True) + hb2)
+        h2 = sample_prob(h2_prob)
+        h3 = h2
+
+        for step in range(gibbs_sampling_steps):
+            v3_prob = tf.nn.sigmoid(tf.matmul(h3, w2, transpose_b=True) + vb2)
+            v3 = sample_prob(v3_prob)
+            h3_prob = tf.nn.sigmoid(tf.matmul(v3, w2, transpose_b=True) + hb2)
+            h3 = sample_prob(h3_prob)
+
+        w2_positive_grad = tf.matmul(tf.transpose(v2), h2)
+        w2_negative_grad = tf.matmul(tf.transpose(v3), h3)
+
+        dw2 = (w2_positive_grad - w2_negative_grad) / tf.to_float(tf.shape(v2)[0])
+
+        update_w2 = tf.assign_add(w2, alpha * dw2)
+        update_vb2 = tf.assign_add(vb2, alpha * tf.reduce_mean(v2 - v3, 0))
+        update_hb2 = tf.assign_add(hb2, alpha * tf.reduce_mean(h2 - h3, 0))
+
+        out2 = (update_w2, update_vb2, update_hb2)
+
+        # rekonsturkcija ulaza na temelju krovnog skrivenog stanja h3
+        v4_prob = tf.nn.sigmoid(tf.matmul(v3, w2) + hb1a)
+        v4 = sample_prob(v4_prob)
+        v5_prob = tf.nn.sigmoid(tf.matmul(v4, w1s,  transpose_b=True) + vb1a)
+
+        err2 = X2 - v5_prob
+        err_sum2 = tf.reduce_mean(err2 * err2)
+
+        initialize2 = tf.initialize_all_variables()
+
+    batch_size = 100
+    epochs = 100
+    n_samples = mnist.train.num_examples
+
+    total_batch = int(n_samples / batch_size) * epochs
+
+    with tf.Session(graph=g2) as sess:
+        sess.run(initialize2)
+
+        for i in range(total_batch):
+            batch, label = mnist.train.next_batch(batch_size)
+            err, _ = sess.run([err_sum2, out2], feed_dict={X2: batch})
+
+            if i%(int(total_batch/10)) == 0:
+                print "Batch count: ", i, "  Avg. reconstruction error: ", err
+
+        w2s, vb2s, hb2s = sess.run([w2, vb2, hb2], feed_dict={X2: batch})
+        vr2, h3_probs, h3s = sess.run([v5_prob, h3_prob, h3], feed_dict={X2: teX[0:50, :]})
+
+    # vizualizacija tezina
+    draw_weights(w2s, h1_shape, Nh2, interpolation="nearest")
+
+    # vizualizacija rekonstrukcije i stanja
+    draw_reconstructions(teX, vr2, h3s, v_shape, h2_shape)
 
 
 if __name__ == '__main__':
