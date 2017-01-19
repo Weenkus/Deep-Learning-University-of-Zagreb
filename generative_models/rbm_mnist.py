@@ -76,7 +76,7 @@ def main():
     Nh = 100
     h1_shape = (10, 10)
 
-    gibbs_sampling_steps = 1
+    gibbs_sampling_steps = 2
     alpha = 0.1  # koeficijent ucenja
 
     g1 = tf.Graph()
@@ -125,6 +125,7 @@ def main():
 
     total_batch = int(n_samples / batch_size) * epochs
     print 'Total batch: {0}'.format(total_batch)
+    total_batch = 200
 
     with tf.Session(graph=g1) as sess:
         sess.run(initialize1)

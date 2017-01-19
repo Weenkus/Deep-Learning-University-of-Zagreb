@@ -142,10 +142,10 @@ def main():
         vr, h1_probs, h1s = sess.run([v1_prob, h1_prob, h1], feed_dict={X1: teX[0:2, :]})
 
     # vizualizacija tezina
-    draw_weights(w1s, v_shape, Nh)
+    #draw_weights(w1s, v_shape, Nh)
 
     # vizualizacija rekonstrukcije i stanja
-    draw_reconstructions(teX, vr, h1s, v_shape, h1_shape)
+    #draw_reconstructions(teX, vr, h1s, v_shape, h1_shape)
 
     ## **************** TASK 2 **************************
     Nh2 = 100
@@ -192,7 +192,7 @@ def main():
         out2 = (update_w2, update_vb2, update_hb2)
 
         # rekonsturkcija ulaza na temelju krovnog skrivenog stanja h3
-        v4_prob = tf.nn.sigmoid(tf.matmul(v3, w2) + hb1a)
+        v4_prob = tf.nn.sigmoid(tf.matmul(h3, w2) + hb1a)
         v4 = sample_prob(v4_prob)
         v5_prob = tf.nn.sigmoid(tf.matmul(v4, w1s,  transpose_b=True) + vb1a)
 
@@ -222,10 +222,10 @@ def main():
         vr2, h3_probs, h3s = sess.run([v5_prob, h3_prob, h3], feed_dict={X2: teX[0:50, :]})
 
     # vizualizacija tezina
-    draw_weights(w2s, h1_shape, Nh2, interpolation="nearest")
+    #draw_weights(w2s, h1_shape, Nh2, interpolation="nearest")
 
     # vizualizacija rekonstrukcije i stanja
-    draw_reconstructions(teX, vr2, h3s, v_shape, h2_shape)
+    #draw_reconstructions(teX, vr2, h3s, v_shape, h2_shape)
 
 
     # ************************** TASK 3 ****************
